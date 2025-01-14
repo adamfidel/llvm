@@ -15,7 +15,7 @@ int main() {
                sycl::property::queue::in_order());
   exp_ext::command_graph Graph{Queue1};
 
-  std::vector<float> Data(Size, 0.0f);
+  std::vector<float> Data(Size, 1.0f);
 
   float *DevicePtr = sycl::malloc_device<float>(Size, Queue1);
 
@@ -49,13 +49,18 @@ int main() {
 #endif
   });
 
-  std::vector<float> HostData(Size, 0.0f);
+  std::vector<float> HostData(Size, 7.0f);
   Queue1.memcpy(HostData.data(), DevicePtr, Size * sizeof(float)).wait();
+  bool IncorrectResult = false;
   for (size_t i = 0; i < Size; ++i) {
-    assert(HostData[i] == 1.0f);
+    IncorrectResult |= !(HostData[i] == 2.0f);
+  if (IncorrectResult)
+  {
+    std::cout << "INCORRECT RESULT DETECTED! Value at " << i << " was " << HostData[i] << std::endl;
   }
-
+  }
+  
   sycl::free(DevicePtr, Queue1);
 
-  return 0;
+  return IncorrectResult;
 }

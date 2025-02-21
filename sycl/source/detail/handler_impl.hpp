@@ -210,6 +210,9 @@ public:
   size_t MAllocSize;
   ur_event_handle_t MAsyncAllocEvent;
 
+  // Pointer which was returned during async_malloc, may be a virtual
+  // reservation if coming from a graph node
+  void *MAllocPtr = nullptr;
   // Allocation ptr to be freed asynchronously.
   void *MFreePtr = nullptr;
 };

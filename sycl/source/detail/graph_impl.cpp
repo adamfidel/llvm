@@ -177,12 +177,42 @@ std::vector<node> createNodesFromImpls(
 }
 
 } // anonymous namespace
+void partition::mapAllocations(sycl::device &SyclDevice,
+                               sycl::context &SyclContext) {
+  // Create physical mem
 
+  for (auto &Alloc : MAllocations) {
+    auto PhysicalMem = std::make_shared<physical_mem_impl>(
+        SyclDevice, SyclContext, Alloc.Size);
+    // Map each allocation
+    PhysicalMem->map(reinterpret_cast<uintptr_t>(Alloc.Ptr), Alloc.Size,
+                     address_access_mode::read_write, 0);
+    MPhysicalMem.push_back(PhysicalMem);
+    Alloc.PhysicalMemID = MPhysicalMem.size() - 1;
+    Alloc.Context = sycl::detail::getSyclObjImpl(SyclContext);
+  }
+}
 void partition::schedule() {
   if (MSchedule.empty()) {
     for (auto &Node : MRoots) {
       sortTopological(Node.lock(), MSchedule, true);
     }
+  }
+}
+
+void exec_graph_impl::collectAllocations() {
+  for (auto &Partition : MPartitions) {
+    size_t MaxMemoryRequired = 0;
+    auto &Nodes = Partition->MSchedule;
+    for (auto &Node : Nodes) {
+      if (Node->MNodeType == node_type::async_malloc) {
+        auto AllocCG = static_cast<sycl::detail::CGAsyncAlloc *>(
+            Node->MCommandGroup.get());
+        Partition->addAllocation(AllocCG->getPtr(), AllocCG->getSize());
+        MaxMemoryRequired += AllocCG->getSize();
+      }
+    }
+    Partition->setMaxMemoryRequired(MaxMemoryRequired);
   }
 }
 
@@ -750,7 +780,7 @@ void graph_impl::beginRecording(
 void exec_graph_impl::findRealDeps(
     std::vector<ur_exp_command_buffer_sync_point_t> &Deps,
     std::shared_ptr<node_impl> CurrentNode, int ReferencePartitionNum) {
-  if (CurrentNode->isEmpty()) {
+  if (!CurrentNode->requiresEnqueue()) {
     for (auto &N : CurrentNode->MPredecessors) {
       auto NodeImpl = N.lock();
       findRealDeps(Deps, NodeImpl, ReferencePartitionNum);
@@ -865,12 +895,15 @@ void exec_graph_impl::createCommandBuffers(
     throw sycl::exception(errc::invalid, "Failed to create UR command-buffer");
   }
 
+  // Map any virtual allocations to physical memory
+  Partition->mapAllocations(Device, MContext);
+
   Partition->MCommandBuffers[Device] = OutCommandBuffer;
 
   for (const auto &Node : Partition->MSchedule) {
     // Empty nodes are not processed as other nodes, but only their
     // dependencies are propagated in findRealDeps
-    if (Node->isEmpty())
+    if (!Node->requiresEnqueue())
       continue;
 
     sycl::detail::CGType type = Node->MCGType;
@@ -1909,6 +1942,8 @@ executable_command_graph::executable_command_graph(
 
 void executable_command_graph::finalizeImpl() {
   impl->makePartitions();
+
+  impl->collectAllocations();
 
   auto Device = impl->getGraphImpl()->getDevice();
   for (auto Partition : impl->getPartitions()) {

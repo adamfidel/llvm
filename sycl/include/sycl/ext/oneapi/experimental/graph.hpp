@@ -114,7 +114,9 @@ enum class node_type {
   prefetch = 6,
   memadvise = 7,
   ext_oneapi_barrier = 8,
-  host_task = 9
+  host_task = 9,
+  async_malloc = 10,
+  async_free = 11
 };
 
 /// Class representing a node in the graph, returned by command_graph::add().

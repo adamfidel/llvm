@@ -8,10 +8,12 @@
 
 #pragma once
 
+#include <detail/physical_mem_impl.hpp>
 #include <sycl/detail/cg_types.hpp>
 #include <sycl/detail/os_util.hpp>
 #include <sycl/ext/oneapi/experimental/graph.hpp>
 #include <sycl/ext/oneapi/experimental/raw_kernel_arg.hpp>
+#include <sycl/ext/oneapi/virtual_mem/virtual_mem.hpp>
 #include <sycl/handler.hpp>
 
 #include <detail/accessor_impl.hpp>
@@ -71,6 +73,11 @@ inline node_type getNodeTypeFromCG(sycl::detail::CGType CGType) {
     return node_type::host_task;
   case sycl::detail::CGType::ExecCommandBuffer:
     return node_type::subgraph;
+  case sycl::detail::CGType::AsyncAlloc:
+    return node_type::async_malloc;
+  case sycl::detail::CGType::AsyncFree:
+    return node_type::async_free;
+
   default:
     assert(false && "Invalid Graph Node Type");
     return node_type::empty;
@@ -471,6 +478,12 @@ public:
     }
   }
 
+  bool requiresEnqueue() const {
+    return MNodeType != node_type::empty &&
+           MNodeType != node_type::async_malloc &&
+           MNodeType != node_type::async_free;
+  }
+
 private:
   void rebuildArgStorage(std::vector<sycl::detail::ArgDesc> &Args,
                          const std::vector<std::vector<char>> &OldArgStorage,
@@ -725,9 +738,33 @@ private:
 };
 
 class partition {
+  struct AllocInfo {
+    void *Ptr;
+    size_t Size;
+    // Index into the array of physical memory
+    size_t PhysicalMemID;
+    // Currently unused
+    bool Mapped = false;
+    ContextImplPtr Context;
+  };
+
 public:
   /// Constructor.
-  partition() : MSchedule(), MCommandBuffers() {}
+  partition()
+      : MSchedule(), MCommandBuffers(), MAllocations(), MPhysicalMem() {}
+
+  ~partition() {
+    for (auto &Alloc : MAllocations) {
+      // Unmap allocations before physical memory is released
+      // Physical mem is released when MPhysicalMem is destroyed
+      unmap(Alloc.Ptr, Alloc.Size,
+            sycl::detail::createSyclObjFromImpl<sycl::context>(Alloc.Context));
+      // Free the VA range
+      free_virtual_mem(
+          reinterpret_cast<uintptr_t>(Alloc.Ptr), Alloc.Size,
+          sycl::detail::createSyclObjFromImpl<sycl::context>(Alloc.Context));
+    }
+  }
 
   /// List of root nodes.
   std::set<std::weak_ptr<node_impl>, std::owner_less<std::weak_ptr<node_impl>>>
@@ -743,6 +780,14 @@ public:
   /// and in-order optmization can be applied on it.
   bool MIsInOrderGraph = false;
 
+  // List of virtual allocations used in this partition
+  std::vector<AllocInfo> MAllocations;
+
+  size_t MMaxMemoryRequired = 0;
+
+  std::vector<std::shared_ptr<physical_mem_impl>> MPhysicalMem;
+
+  // std::map<AllocInfo, std::shared_ptr<physical_mem_impl>> MAllocationMap;
   /// @return True if the partition contains a host task
   bool isHostTask() const {
     return (MRoots.size() && ((*MRoots.begin()).lock()->MCGType ==
@@ -769,6 +814,14 @@ public:
 
   /// Add nodes to MSchedule.
   void schedule();
+
+  void addAllocation(void *Ptr, size_t Size) {
+    MAllocations.push_back({Ptr, Size, 0, false});
+  }
+
+  void mapAllocations(sycl::device &SyclDevice, sycl::context &SyclContext);
+
+  void setMaxMemoryRequired(size_t Size) { MMaxMemoryRequired = Size; }
 };
 
 /// Implementation details of command_graph<modifiable>.
@@ -1310,6 +1363,8 @@ public:
   void updateImpl(std::shared_ptr<node_impl> NodeImpl);
 
   unsigned long long getID() const { return MID; }
+
+  void collectAllocations();
 
 private:
   /// Create a command-group for the node and add it to command-buffer by going

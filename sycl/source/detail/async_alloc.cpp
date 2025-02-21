@@ -12,6 +12,7 @@
 #include <sycl/detail/ur.hpp>
 #include <sycl/ext/oneapi/experimental/async_alloc/async_alloc.hpp>
 #include <sycl/ext/oneapi/experimental/enqueue_functions.hpp>
+#include <sycl/ext/oneapi/virtual_mem/virtual_mem.hpp>
 
 namespace sycl {
 inline namespace _V1 {
@@ -249,6 +250,10 @@ __SYCL_EXPORT memory_pool::memory_pool(const sycl::context &ctx,
       "Creating a pool from an existing allocation is unsupported!");
 }
 
+size_t AlignByteSize(size_t UnalignedByteSize, size_t Granularity) {
+  return ((UnalignedByteSize + Granularity - 1) / Granularity) * Granularity;
+}
+
 // <--- Async allocs/frees --->
 __SYCL_EXPORT void *async_malloc(sycl::handler &h, sycl::usm::alloc kind,
                                  size_t size) {
@@ -259,24 +264,47 @@ __SYCL_EXPORT void *async_malloc(sycl::handler &h, sycl::usm::alloc kind,
         sycl::make_error_code(sycl::errc::feature_not_supported),
         "Host allocated pools are unsupported!");
   }
+  // Copy size as we may modify it for graph based on granularity of the device.
+  size_t LocalSize = size;
 
-  auto &Adapter = h.getContextImplPtr()->getAdapter();
-  auto &Q = h.MQueue->getHandleRef();
-
-  // Get events to wait on.
-  auto depEvents = detail::getUrEvents(h.impl->CGData.MEvents);
-  uint32_t numEvents = h.impl->CGData.MEvents.size();
-
-  void *alloc = nullptr;
   ur_event_handle_t Event;
-  Adapter->call<sycl::errc::runtime,
-                sycl::detail::UrApiKind::urEnqueueUSMDeviceAllocExp>(
-      Q, (ur_usm_pool_handle_t)0, size, nullptr, numEvents, depEvents.data(),
-      &alloc, &Event);
+  void *alloc = nullptr;
+  // If a graph is present don't do the allocation but instead do a virtual
+  // reservation
+  if (auto Graph = h.getCommandGraph(); Graph) {
+    context GraphCtx = Graph->getContext();
+    auto &CtxImpl = sycl::detail::getSyclObjImpl(GraphCtx);
+    auto &Adapter = CtxImpl->getAdapter();
+    size_t Granularity =
+    get_mem_granularity(Graph->getDevice(), Graph->getContext());
+    uintptr_t StartPtr = 0;
+    size_t AlignedSize = AlignByteSize(size, Granularity);
+    // Do virtual reservation
+    Adapter->call<sycl::errc::runtime,
+    sycl::detail::UrApiKind::urVirtualMemReserve>(
+      CtxImpl->getHandleRef(),
+      reinterpret_cast<void *>(StartPtr), AlignedSize, &alloc);
+      
+    LocalSize = AlignedSize;
+
+  } else {
+
+    auto &CtxImpl = h.getContextImplPtr();
+    auto &Adapter = CtxImpl->getAdapter();
+    auto &Q = h.MQueue->getHandleRef();
+    // Get events to wait on.
+    auto depEvents = detail::getUrEvents(h.impl->CGData.MEvents);
+    uint32_t numEvents = h.impl->CGData.MEvents.size();
+    Adapter->call<sycl::errc::runtime,
+                  sycl::detail::UrApiKind::urEnqueueUSMDeviceAllocExp>(
+        Q, (ur_usm_pool_handle_t)0, size, nullptr, numEvents, depEvents.data(),
+        &alloc, &Event);
+  }
 
   // Async malloc must return a void* immediately.
   // Set up CommandGroup which is a no-op and pass the event from the alloc.
-  h.impl->MAllocSize = size;
+  h.impl->MAllocPtr = alloc;
+  h.impl->MAllocSize = LocalSize;
   h.impl->MAsyncAllocEvent = Event;
   h.setType(detail::CGType::AsyncAlloc);
 

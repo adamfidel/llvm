@@ -670,6 +670,7 @@ public:
 
 /// "Async Alloc" command group class.
 class CGAsyncAlloc : public CG {
+  void *MAllocPtr;
 
   // These members are unused but kept in case of logging.
   size_t MSize;
@@ -680,13 +681,13 @@ class CGAsyncAlloc : public CG {
 
 public:
   CGAsyncAlloc(
-      size_t size,
+      void *AllocPtr, size_t size,
       std::shared_ptr<ext::oneapi::experimental::detail::memory_pool_impl>
           MemPool,
       ur_event_handle_t event, CG::StorageInitHelper CGData,
       detail::code_location loc = {})
-      : CG(CGType::AsyncAlloc, std::move(CGData), std::move(loc)), MSize(size),
-        MMemPool(MemPool), MEvent(event) {}
+      : CG(CGType::AsyncAlloc, std::move(CGData), std::move(loc)),
+        MAllocPtr(AllocPtr), MSize(size), MMemPool(MemPool), MEvent(event) {}
 
   std::shared_ptr<ext::oneapi::experimental::detail::memory_pool_impl>
   getMemPool() const {
@@ -696,6 +697,8 @@ public:
   size_t getSize() const { return MSize; }
 
   ur_event_handle_t getEvent() const { return MEvent; }
+
+  void *getPtr() const { return MAllocPtr; }
 };
 
 /// "Async Free" command group class.

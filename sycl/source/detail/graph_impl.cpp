@@ -853,7 +853,8 @@ void exec_graph_impl::createCommandBuffers(
   ur_exp_command_buffer_handle_t OutCommandBuffer;
   ur_exp_command_buffer_desc_t Desc{
       UR_STRUCTURE_TYPE_EXP_COMMAND_BUFFER_DESC, nullptr, MIsUpdatable,
-      Partition->MIsInOrderGraph && !MEnableProfiling, MEnableProfiling};
+      true, MEnableProfiling};
+      //Partition->MIsInOrderGraph && !MEnableProfiling, MEnableProfiling};
   auto ContextImpl = sycl::detail::getSyclObjImpl(MContext);
   const sycl::detail::AdapterPtr &Adapter = ContextImpl->getAdapter();
   auto DeviceImpl = sycl::detail::getSyclObjImpl(Device);

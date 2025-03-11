@@ -68,6 +68,15 @@ urCommandBufferCreateExp(ur_context_handle_t context, ur_device_handle_t device,
       context->getCommandListCache().getRegularCommandList(
           device->ZeDevice, true, queueGroupOrdinal, true);
 
+  // If this environment variable is:
+  //   - Set to 1: the command buffer will be forced to in-order
+  //   - Any other value or not Defined: The default behaviour will be used
+  const char *ForceInOrderEnvVarName = "UR_L0_CMD_BUFFER_FORCE_IN_ORDER";
+  const char *UrRet = std::getenv(ForceInOrderEnvVarName);
+  if (UrRet && std::atoi(UrRet) == 1) {
+    commandBufferDesc->isInOrder = true;
+  }
+
   *commandBuffer = new ur_exp_command_buffer_handle_t_(
       context, device, std::move(zeCommandList), commandBufferDesc);
   return UR_RESULT_SUCCESS;

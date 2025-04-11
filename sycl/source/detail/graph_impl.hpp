@@ -1631,6 +1631,13 @@ public:
   /// array
   void updateWorkGroupMem(size_t BufferSize);
 
+  /// Update the internal value of this dynamic parameter as well as the value
+  /// of this parameter in all registered nodes and dynamic CGs. Should only be
+  /// called for dynamic_work_group_memory arguments parameter.
+  /// @param BufferSize The total size in bytes of the new local_accessor
+  /// array
+  void updateLocalAccessor(size_t BufferSize);
+
   /// Static helper function for updating command-group
   /// dynamic_work_group_memory arguments.
   /// @param CG The command-group to update the argument information for.
@@ -1638,6 +1645,15 @@ public:
   /// @param BufferSize The total size in bytes of the new work_group_memory
   /// array
   static void updateCGWorkGroupMem(std::shared_ptr<sycl::detail::CG> CG,
+                                   int ArgIndex, size_t BufferSize);
+
+  /// Static helper function for updating command-group
+  /// dynamic_work_group_memory arguments.
+  /// @param CG The command-group to update the argument information for.
+  /// @param ArgIndex The argument index to update.
+  /// @param BufferSize The total size in bytes of the new local_accessor
+  /// array
+  static void updateCGLocalAccessor(std::shared_ptr<sycl::detail::CG> CG,
                                    int ArgIndex, size_t BufferSize);
 
   /// Static helper function for updating command-group value arguments.

@@ -1035,6 +1035,47 @@ void handler::processArg(void *Ptr, const detail::kernel_param_kind_t &Kind,
     }
     break;
   }
+  case kernel_param_kind_t::kind_dynamic_accessor: {
+    const access::target AccTarget =
+        static_cast<access::target>(Size & AccessTargetMask);
+    switch (AccTarget) {
+    case access::target::local: {
+      detail::LocalAccessorImplHost *LAcc =
+          static_cast<detail::LocalAccessorImplHost *>(Ptr);
+
+      range<3> &Size = LAcc->MSize;
+      const int Dims = LAcc->MDims;
+      int SizeInBytes = LAcc->MElemSize;
+      for (int I = 0; I < Dims; ++I)
+        SizeInBytes *= Size[I];
+      // Some backends do not accept zero-sized local memory arguments, so we
+      // make it a minimum allocation of 1 byte.
+      SizeInBytes = std::max(SizeInBytes, 1);
+      impl->MArgs.emplace_back(kernel_param_kind_t::kind_std_layout, nullptr,
+                               SizeInBytes, Index + IndexShift);
+      // TODO ESIMD currently does not suport MSize field passing yet
+      // accessor::init for ESIMD-mode accessor has a single field, translated
+      // to a single kernel argument set above.
+      if (!IsESIMD && !IsKernelCreatedFromSource) {
+        ++IndexShift;
+        const size_t SizeAccField = (Dims == 0 ? 1 : Dims) * sizeof(Size[0]);
+        addArg(kernel_param_kind_t::kind_std_layout, &Size, SizeAccField,
+               Index + IndexShift);
+        ++IndexShift;
+        addArg(kernel_param_kind_t::kind_std_layout, &Size, SizeAccField,
+               Index + IndexShift);
+        ++IndexShift;
+        addArg(kernel_param_kind_t::kind_std_layout, &Size, SizeAccField,
+               Index + IndexShift);
+      }
+      break;
+    }
+    default: {
+      assert(false && "Unsupported dynamic accessor target");
+    }
+    }
+    break;
+  }
   case kernel_param_kind_t::kind_dynamic_work_group_memory: {
 
     auto *DynBase = static_cast<

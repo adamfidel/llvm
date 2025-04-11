@@ -541,6 +541,8 @@ protected:
 
   void updateWorkGroupMem(size_t BufferSize);
 
+  void updateLocalAccessor(size_t BufferSize);
+
   std::shared_ptr<dynamic_parameter_impl> impl;
 
   template <class Obj>
@@ -573,6 +575,34 @@ private:
   size_t BufferSize{};
   friend class sycl::handler;
 };
+
+// TODO Maybe merge this and dynamic_work_group_memory_base
+class dynamic_local_accessor_base
+#ifndef __SYCL_DEVICE_ONLY__
+    : public dynamic_parameter_base
+#endif
+{
+public:
+  dynamic_local_accessor_base() = default;
+#ifndef __SYCL_DEVICE_ONLY__
+  dynamic_local_accessor_base(
+      experimental::command_graph<graph_state::modifiable> Graph, size_t Size)
+      : dynamic_parameter_base(Graph), BufferSize(Size) {}
+#else
+  dynamic_local_accessor_base(
+      experimental::command_graph<graph_state::modifiable> /*Graph*/,
+      size_t Size)
+      : BufferSize(Size) {}
+#endif
+
+private:
+#ifdef __SYCL_DEVICE_ONLY__
+  [[maybe_unused]] unsigned char Padding[sizeof(dynamic_parameter_base)];
+#endif
+  size_t BufferSize{};
+  friend class sycl::handler;
+};
+
 } // namespace detail
 
 template <typename DataT, typename PropertyListT = empty_properties_t>
@@ -628,6 +658,69 @@ private:
       value_type, access::address_space::local_space>::type *;
 
   void __init(decoratedPtr Ptr) { this->WorkGroupMem.__init(Ptr); }
+#endif
+};
+
+template <typename DataT, int Dimensions = 1>
+class __SYCL_SPECIAL_CLASS
+__SYCL_TYPE(dynamic_local_accessor) dynamic_local_accessor : public detail::dynamic_local_accessor_base {
+public:
+
+  static_assert(Dimensions > 0 && Dimensions <= 3);
+
+  // Frontend requires special types to have a default constructor in order to
+  // have a uniform way of initializing an object of special type to then call
+  // the __init method on it. This is purely an implementation detail and not
+  // part of the spec.
+  // TODO: Revisit this once https://github.com/intel/llvm/issues/16061 is
+  // closed.
+  dynamic_local_accessor() = default;
+
+  /// Constructs a new dynamic_local_accessor object.
+  /// @param Graph The graph associated with this object.
+  /// @param AllocationSize The size of the local accessor.
+  /// @param PropList List of properties for the underlying accessor.
+  dynamic_local_accessor(
+      experimental::command_graph<graph_state::modifiable> Graph, range<Dimensions> AllocationSize, const property_list &PropList = {})
+      : detail::dynamic_local_accessor_base(
+            Graph, AllocationSize.size()) {}
+
+  local_accessor<DataT, Dimensions> get() const {
+#ifndef __SYCL_DEVICE_ONLY__
+    throw sycl::exception(sycl::make_error_code(errc::invalid),
+                          "Error: dynamic_local_accessor::get() can be only "
+                          "called on the device!");
+#endif
+    return LocalAccessor;
+  }
+
+  /// Updates on the host this dynamic_local_accessor and all registered
+  /// nodes with a new size.
+  /// @param Num The new number of elements in the unbounded array.
+  void update([[maybe_unused]] range<Dimensions> NewAllocationSize) {
+#ifndef __SYCL_DEVICE_ONLY__
+    detail::dynamic_parameter_base::updateWorkGroupMem(NewAllocationSize.size());
+#endif
+  }
+
+private:
+  local_accessor<DataT, Dimensions> LocalAccessor;
+
+#ifdef __SYCL_DEVICE_ONLY__
+
+  using local_acc =
+      local_accessor_base<DataT, Dimensions,
+                          detail::accessModeFromConstness<DataT>(),
+                          access::placeholder::false_t>;
+
+//  using local_acc::local_acc;
+
+  void __init(typename local_acc::ConcreteASPtrType Ptr,
+              range<local_acc::AdjustedDim> AccessRange,
+              range<local_acc::AdjustedDim> range,
+              id<local_acc::AdjustedDim> id) {
+    this->LocalAccessor.__init(Ptr, AccessRange, range, id);
+  }
 #endif
 };
 

@@ -164,6 +164,7 @@ namespace ext::oneapi::experimental::detail {
 class graph_impl;
 class dynamic_parameter_base;
 class dynamic_work_group_memory_base;
+class dynamic_local_accessor_base;
 } // namespace ext::oneapi::experimental::detail
 namespace detail {
 
@@ -698,6 +699,12 @@ private:
   setArgHelper(int ArgIndex,
                ext::oneapi::experimental::detail::dynamic_work_group_memory_base
                    &DynWorkGroupBase);
+
+  // setArgHelper for graph dynamic_local_accessor
+  void
+  setArgHelper(int ArgIndex,
+               ext::oneapi::experimental::detail::dynamic_local_accessor_base
+                   &DynLocalAccessor);
 
   // setArgHelper for the raw_kernel_arg extension type.
   void setArgHelper(int ArgIndex,
@@ -1799,6 +1806,17 @@ public:
     ext::oneapi::experimental::detail::dynamic_work_group_memory_base
         &dynWorkGroupBase = dynWorkGroupMem;
     setArgHelper(argIndex, dynWorkGroupBase);
+  }
+
+  // set_arg for graph dynamic_local_accessor
+  template <typename DataT, int Dimensions>
+  void
+  set_arg(int argIndex,
+          ext::oneapi::experimental::dynamic_local_accessor<DataT, Dimensions>
+              &DynLocalAccessor) {
+    ext::oneapi::experimental::detail::dynamic_local_accessor_base
+        &DynLocalAccessorBase = DynLocalAccessor;
+    setArgHelper(argIndex, DynLocalAccessorBase);
   }
 
   // set_arg for the raw_kernel_arg extension type.

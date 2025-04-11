@@ -2019,6 +2019,10 @@ void dynamic_parameter_base::updateWorkGroupMem(size_t BufferSize) {
   impl->updateWorkGroupMem(BufferSize);
 }
 
+void dynamic_parameter_base::updateLocalAccessor(size_t BufferSize) {
+  impl->updateLocalAccessor(BufferSize);
+}
+
 void dynamic_parameter_impl::updateValue(const raw_kernel_arg *NewRawValue,
                                          size_t Size) {
   // Number of bytes is taken from member of raw_kernel_arg object rather
@@ -2093,7 +2097,40 @@ void dynamic_parameter_impl::updateWorkGroupMem(size_t BufferSize) {
   }
 }
 
+void dynamic_parameter_impl::updateLocalAccessor(size_t BufferSize) {
+  for (auto &[NodeWeak, ArgIndex] : MNodes) {
+    auto NodeShared = NodeWeak.lock();
+    if (NodeShared) {
+      dynamic_parameter_impl::updateCGLocalAccessor(NodeShared->MCommandGroup,
+                                                   ArgIndex, BufferSize);
+    }
+  }
+
+  for (auto &DynCGInfo : MDynCGs) {
+    auto DynCG = DynCGInfo.DynCG.lock();
+    if (DynCG) {
+      auto &CG = DynCG->MCommandGroups[DynCGInfo.CGIndex];
+      dynamic_parameter_impl::updateCGLocalAccessor(CG, DynCGInfo.ArgIndex,
+                                                   BufferSize);
+    }
+  }
+}
+
 void dynamic_parameter_impl::updateCGWorkGroupMem(
+    std::shared_ptr<sycl::detail::CG> CG, int ArgIndex, size_t BufferSize) {
+
+  auto &Args = static_cast<sycl::detail::CGExecKernel *>(CG.get())->MArgs;
+  for (auto &Arg : Args) {
+    if (Arg.MIndex != ArgIndex) {
+      continue;
+    }
+    assert(Arg.MType == sycl::detail::kernel_param_kind_t::kind_std_layout);
+    Arg.MSize = BufferSize;
+    break;
+  }
+}
+
+void dynamic_parameter_impl::updateCGLocalAccessor(
     std::shared_ptr<sycl::detail::CG> CG, int ArgIndex, size_t BufferSize) {
 
   auto &Args = static_cast<sycl::detail::CGExecKernel *>(CG.get())->MArgs;

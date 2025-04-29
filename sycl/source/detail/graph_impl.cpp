@@ -1015,6 +1015,7 @@ exec_graph_impl::enqueue(const std::shared_ptr<sycl::detail::queue_impl> &Queue,
     auto CommandBuffer = CurrentPartition->MCommandBuffers[Queue->get_device()];
 
     if (CommandBuffer) {
+#if 0
       for (std::vector<sycl::detail::EventImplPtr>::iterator It =
                MExecutionEvents.begin();
            It != MExecutionEvents.end();) {
@@ -1036,6 +1037,7 @@ exec_graph_impl::enqueue(const std::shared_ptr<sycl::detail::queue_impl> &Queue,
       }
 
       NewEvent = CreateNewEvent();
+#endif
       ur_event_handle_t UREvent = nullptr;
       // Merge requirements from the nodes into requirements (if any) from the
       // handler.
@@ -1047,14 +1049,20 @@ exec_graph_impl::enqueue(const std::shared_ptr<sycl::detail::queue_impl> &Queue,
       // If we have no requirements or dependent events for the command buffer,
       // enqueue it directly
       if (CGData.MRequirements.empty() && CGData.MEvents.empty()) {
+#if 0
         NewEvent->setSubmissionTime();
         NewEvent->setHostEnqueueTime();
+#endif
         ur_result_t Res =
             Queue->getAdapter()
                 ->call_nocheck<
                     sycl::detail::UrApiKind::urEnqueueCommandBufferExp>(
                     Queue->getHandleRef(), CommandBuffer, 0, nullptr, &UREvent);
+#if 0
         NewEvent->setHandle(UREvent);
+#else
+        return sycl::event{};
+#endif
         if (Res == UR_RESULT_ERROR_INVALID_QUEUE_PROPERTIES) {
           throw sycl::exception(
               make_error_code(errc::invalid),

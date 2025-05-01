@@ -33,6 +33,7 @@
 #include <sycl/properties/buffer_properties.hpp>      // for buffer, buffer...
 #include <sycl/property_list.hpp>                     // for property_list
 #include <sycl/range.hpp>                             // for range
+#include <sycl/ext/oneapi/experimental/graph.hpp>     // FIXME avoid this include
 
 #include <cstddef>     // for size_t
 #include <functional>  // for hash
@@ -215,6 +216,7 @@
 namespace sycl {
 inline namespace _V1 {
 class stream;
+
 namespace ext::intel::esimd::detail {
 // Forward declare a "back-door" access class to support ESIMD.
 class AccessorPrivateProxy;
@@ -2467,12 +2469,17 @@ private:
 #endif
 };
 
+//template<typename, int> class dynamic_local_accessor;
+
 template <typename DataT, int Dimensions = 1>
 class __SYCL_EBO __SYCL_SPECIAL_CLASS __SYCL_TYPE(local_accessor) local_accessor
     : public local_accessor_base<DataT, Dimensions,
                                  detail::accessModeFromConstness<DataT>(),
                                  access::placeholder::false_t>,
       public detail::OwnerLessBase<local_accessor<DataT, Dimensions>> {
+public: // FIXME Hack
+  friend class sycl::handler;
+  template<typename, int> friend class dynamic_local_accessor;
 
   using local_acc =
       local_accessor_base<DataT, Dimensions,

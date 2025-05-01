@@ -1134,6 +1134,19 @@ void handler::setArgHelper(
   registerDynamicParameter(DynWorkGroupBase, ArgIndex);
 }
 
+void
+handler::setArgHelper(int ArgIndex,
+             ext::oneapi::experimental::detail::dynamic_local_accessor_base
+                 &DynLocalAccessor) {
+
+  addArg(detail::kernel_param_kind_t::kind_dynamic_accessor,
+         &DynLocalAccessor, 0, ArgIndex);
+
+  // Register the dynamic parameter with the handler for later association
+  // with the node being added
+  registerDynamicParameter(DynLocalAccessor, ArgIndex);
+}
+
 // The argument can take up more space to store additional information about
 // MAccessRange, MMemoryRange, and MOffset added with addArgsForGlobalAccessor.
 // We use the worst-case estimate because the lifetime of the vector is short.

@@ -50,6 +50,7 @@ enum class graph_state {
 template <graph_state State> class command_graph;
 class raw_kernel_arg;
 template <typename, typename> class work_group_memory;
+//template <typename, int> class local_accessor;
 
 namespace detail {
 // List of sycl features and extensions which are not supported by graphs. Used
@@ -708,17 +709,20 @@ private:
 
 #ifdef __SYCL_DEVICE_ONLY__
 
-  using local_acc =
-      local_accessor_base<DataT, Dimensions,
-                          detail::accessModeFromConstness<DataT>(),
-                          access::placeholder::false_t>;
+//  using local_acc =
+//      local_accessor_base<DataT, Dimensions,
+//                          detail::accessModeFromConstness<DataT>(),
+//                          access::placeholder::false_t>;
 
 //  using local_acc::local_acc;
 
-  void __init(typename local_acc::ConcreteASPtrType Ptr,
-              range<local_acc::AdjustedDim> AccessRange,
-              range<local_acc::AdjustedDim> range,
-              id<local_acc::AdjustedDim> id) {
+  constexpr static access::address_space AS = detail::TargetToAS<access::target::local>::AS;
+  using ConcreteASPtrType = typename detail::DecoratedType<DataT, AS>::type *;
+
+  void __init(ConcreteASPtrType Ptr,
+              range<Dimensions> AccessRange,
+              range<Dimensions> range,
+              id<Dimensions> id) {
     this->LocalAccessor.__init(Ptr, AccessRange, range, id);
   }
 #endif

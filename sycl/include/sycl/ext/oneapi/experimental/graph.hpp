@@ -708,18 +708,7 @@ private:
   local_accessor<DataT, Dimensions> LocalAccessor;
 
 #ifdef __SYCL_DEVICE_ONLY__
-
-//  using local_acc =
-//      local_accessor_base<DataT, Dimensions,
-//                          detail::accessModeFromConstness<DataT>(),
-//                          access::placeholder::false_t>;
-
-//  using local_acc::local_acc;
-
-  constexpr static access::address_space AS = detail::TargetToAS<access::target::local>::AS;
-  using ConcreteASPtrType = typename detail::DecoratedType<DataT, AS>::type *;
-
-  void __init(ConcreteASPtrType Ptr,
+  void __init(local_accessor<DataT, Dimensions>::ConcreteASPtrType Ptr,
               range<Dimensions> AccessRange,
               range<Dimensions> range,
               id<Dimensions> id) {

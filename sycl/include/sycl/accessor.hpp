@@ -33,7 +33,6 @@
 #include <sycl/properties/buffer_properties.hpp>      // for buffer, buffer...
 #include <sycl/property_list.hpp>                     // for property_list
 #include <sycl/range.hpp>                             // for range
-#include <sycl/ext/oneapi/experimental/graph.hpp>     // FIXME avoid this include
 
 #include <cstddef>     // for size_t
 #include <functional>  // for hash
@@ -229,6 +228,10 @@ template <typename DataT, int Dimensions = 1,
           typename PropertyListT = ext::oneapi::accessor_property_list<>>
 class accessor;
 
+namespace ext::oneapi::experimental {
+template <typename, int> class dynamic_local_accessor;
+}
+
 namespace detail {
 
 template <typename... Ts>
@@ -346,6 +349,7 @@ protected:
             typename AccType =
                 accessor<DataT, Dimensions, AccessMode, AccessTarget,
                          IsPlaceholder, PropertyListT>>
+
   class AccessorSubscript {
     static constexpr int Dims = Dimensions;
 
@@ -2150,6 +2154,7 @@ class __SYCL_SPECIAL_CLASS local_accessor_base :
 #endif
     public detail::accessor_common<DataT, Dimensions, AccessMode,
                                    access::target::local, IsPlaceholder> {
+
 protected:
   constexpr static int AdjustedDim = Dimensions == 0 ? 1 : Dimensions;
 
@@ -2261,8 +2266,6 @@ protected:
   template <class T>
   friend T detail::createSyclObjFromImpl(
       std::add_lvalue_reference_t<const decltype(T::impl)> ImplObj);
-
-  template <typename DataT_, int Dimensions_> friend class local_accessor;
 
 public:
   using value_type = DataT;
@@ -2469,17 +2472,12 @@ private:
 #endif
 };
 
-//template<typename, int> class dynamic_local_accessor;
-
 template <typename DataT, int Dimensions = 1>
 class __SYCL_EBO __SYCL_SPECIAL_CLASS __SYCL_TYPE(local_accessor) local_accessor
     : public local_accessor_base<DataT, Dimensions,
                                  detail::accessModeFromConstness<DataT>(),
                                  access::placeholder::false_t>,
       public detail::OwnerLessBase<local_accessor<DataT, Dimensions>> {
-public: // FIXME Hack
-  friend class sycl::handler;
-  template<typename, int> friend class dynamic_local_accessor;
 
   using local_acc =
       local_accessor_base<DataT, Dimensions,
@@ -2645,6 +2643,7 @@ public:
 
 private:
   friend class sycl::ext::intel::esimd::detail::AccessorPrivateProxy;
+  template<typename, int> friend class ext::oneapi::experimental::dynamic_local_accessor;
 };
 
 template <typename DataT, int Dimensions = 1,

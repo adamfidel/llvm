@@ -717,8 +717,22 @@ event handler::finalize() {
           nullptr, impl->MExecGraph, std::move(impl->CGData)));
 
     } else {
+      auto start_time = std::chrono::high_resolution_clock::now();
+
       event GraphCompletionEvent =
           impl->MExecGraph->enqueue(MQueue, std::move(impl->CGData));
+
+      auto stop_time = std::chrono::high_resolution_clock::now();
+
+      impl->MExecGraph->full_enqueue_durations.push_back(
+          std::chrono::duration_cast<std::chrono::nanoseconds>(stop_time -
+                                                               start_time)
+              .count());
+      impl->MExecGraph->partial_enqueue_durations.push_back(
+          std::chrono::duration_cast<std::chrono::nanoseconds>(
+              impl->MExecGraph->stop_time - impl->MExecGraph->start_time)
+              .count());
+
       MLastEvent = GraphCompletionEvent;
       return MLastEvent;
     }

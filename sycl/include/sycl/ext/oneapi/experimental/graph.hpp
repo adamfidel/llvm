@@ -25,7 +25,8 @@
 #include <sycl/properties/property_traits.hpp> // for is_property, is_property_of
 #include <sycl/property_list.hpp>              // for property_list
 
-#include <functional>  // for function
+#include <functional> // for function
+#include <iostream>
 #include <memory>      // for shared_ptr
 #include <type_traits> // for true_type
 #include <vector>      // for vector
@@ -417,6 +418,7 @@ public:
   /// An executable command-graph is not user constructable.
   executable_command_graph() = delete;
 
+  void print_enqueue_duration();
   /// Update the inputs & output of the graph.
   /// @param Graph Graph to use the inputs and outputs of.
   void update(const command_graph<graph_state::modifiable> &Graph);

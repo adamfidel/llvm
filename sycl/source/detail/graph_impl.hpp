@@ -9,6 +9,7 @@
 #pragma once
 
 #include "detail/queue_impl.hpp"
+#include <chrono>
 #include <sycl/detail/cg_types.hpp>
 #include <sycl/detail/os_util.hpp>
 #include <sycl/ext/oneapi/experimental/graph.hpp>
@@ -1274,6 +1275,10 @@ private:
 /// Class representing the implementation of command_graph<executable>.
 class exec_graph_impl {
 public:
+  std::chrono::time_point<std::chrono::high_resolution_clock> start_time;
+  std::chrono::time_point<std::chrono::high_resolution_clock> stop_time;
+  std::vector<double> full_enqueue_durations;
+  std::vector<double> partial_enqueue_durations;
   using ReadLock = std::shared_lock<std::shared_mutex>;
   using WriteLock = std::unique_lock<std::shared_mutex>;
 

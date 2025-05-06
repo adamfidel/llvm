@@ -1010,6 +1010,7 @@ exec_graph_impl::enqueue(const std::shared_ptr<sycl::detail::queue_impl> &Queue,
     auto CommandBuffer = CurrentPartition->MCommandBuffers[Queue->get_device()];
 
     if (CommandBuffer) {
+      // #if 0
       for (std::vector<sycl::detail::EventImplPtr>::iterator It =
                MExecutionEvents.begin();
            It != MExecutionEvents.end();) {
@@ -1029,8 +1030,10 @@ exec_graph_impl::enqueue(const std::shared_ptr<sycl::detail::queue_impl> &Queue,
           It = MExecutionEvents.erase(It);
         }
       }
+      // This loop takes around 100 ns
 
       NewEvent = CreateNewEvent();
+      // #endif
       ur_event_handle_t UREvent = nullptr;
       // Merge requirements from the nodes into requirements (if any) from the
       // handler.
@@ -1039,17 +1042,24 @@ exec_graph_impl::enqueue(const std::shared_ptr<sycl::detail::queue_impl> &Queue,
       CGData.MAccStorage.insert(CGData.MAccStorage.end(), MAccessors.begin(),
                                 MAccessors.end());
 
+      // 120 ns
       // If we have no requirements or dependent events for the command buffer,
       // enqueue it directly
       if (CGData.MRequirements.empty() && CGData.MEvents.empty()) {
+        // #if 0
         NewEvent->setSubmissionTime();
         NewEvent->setHostEnqueueTime();
+        // #endif
         ur_result_t Res =
             Queue->getAdapter()
                 ->call_nocheck<
                     sycl::detail::UrApiKind::urEnqueueCommandBufferExp>(
                     Queue->getHandleRef(), CommandBuffer, 0, nullptr, &UREvent);
+        // #if 0
         NewEvent->setHandle(UREvent);
+        // #else
+        return sycl::event{};
+        // #endif
         if (Res == UR_RESULT_ERROR_INVALID_QUEUE_PROPERTIES) {
           throw sycl::exception(
               make_error_code(errc::invalid),
@@ -1067,8 +1077,10 @@ exec_graph_impl::enqueue(const std::shared_ptr<sycl::detail::queue_impl> &Queue,
             std::make_unique<sycl::detail::CGExecCommandBuffer>(
                 CommandBuffer, nullptr, std::move(CGData));
 
+        start_time = std::chrono::high_resolution_clock::now();
         NewEvent = sycl::detail::Scheduler::getInstance().addCG(
             std::move(CommandGroup), Queue, /*EventNeeded=*/true);
+        stop_time = std::chrono::high_resolution_clock::now();
       }
       NewEvent->setEventFromSubmittedExecCommandBuffer(true);
     } else if ((CurrentPartition->MSchedule.size() > 0) &&
@@ -1965,6 +1977,110 @@ void executable_command_graph::finalizeImpl() {
   }
 }
 
+void executable_command_graph::print_enqueue_duration() {
+  // Function to remove outliers using IQR method (more robust)
+  auto removeOutliers_IQR = [](std::vector<double> &full_durations,
+                               std::vector<double> &partial_durations,
+                               double iqr_factor = 1.5) {
+    // Make copies that we'll filter
+    std::vector<double> &full_filtered = full_durations;
+    std::vector<double> &partial_filtered = partial_durations;
+    std::vector<size_t> indices_to_remove;
+
+    // Need to sort to find quartiles
+    std::vector<double> full_sorted = full_filtered;
+    std::sort(full_sorted.begin(), full_sorted.end());
+
+    // Calculate Q1 and Q3
+    size_t n = full_sorted.size();
+    double q1_idx = n * 0.25;
+    double q3_idx = n * 0.75;
+
+    // Simple interpolation for quartiles
+    double q1 = (full_sorted[static_cast<size_t>(q1_idx)] +
+                 full_sorted[static_cast<size_t>(std::ceil(q1_idx))]) /
+                2.0;
+    double q3 = (full_sorted[static_cast<size_t>(q3_idx)] +
+                 full_sorted[static_cast<size_t>(std::ceil(q3_idx))]) /
+                2.0;
+
+    // Calculate IQR and bounds
+    double iqr = q3 - q1;
+    double lower_bound = q1 - (iqr_factor * iqr);
+    double upper_bound = q3 + (iqr_factor * iqr);
+
+    // Find outlier indices
+    for (size_t i = 0; i < full_filtered.size(); ++i) {
+      if (full_filtered[i] < lower_bound || full_filtered[i] > upper_bound) {
+        indices_to_remove.push_back(i);
+      }
+    }
+
+    // Remove the outliers from both vectors (in reverse order)
+    std::sort(indices_to_remove.begin(), indices_to_remove.end(),
+              std::greater<size_t>());
+    for (const auto &idx : indices_to_remove) {
+      full_filtered.erase(full_filtered.begin() + idx);
+      partial_filtered.erase(partial_filtered.begin() + idx);
+    }
+  };
+
+  removeOutliers_IQR(impl->full_enqueue_durations,
+                     impl->partial_enqueue_durations);
+
+  const size_t n = impl->full_enqueue_durations.size();
+  std::vector<double> differences(n);
+
+  // Calculate differences
+  for (size_t i = 0; i < n; ++i) {
+    differences[i] =
+        impl->full_enqueue_durations[i] - impl->partial_enqueue_durations[i];
+  }
+  // Calculate means
+  double full_mean = std::accumulate(impl->full_enqueue_durations.begin(),
+                                     impl->full_enqueue_durations.end(), 0.0) /
+                     n;
+  double partial_mean =
+      std::accumulate(impl->partial_enqueue_durations.begin(),
+                      impl->partial_enqueue_durations.end(), 0.0) /
+      n;
+  double diff_mean =
+      std::accumulate(differences.begin(), differences.end(), 0.0) / n;
+
+  // Calculate sum of squared differences for standard deviation
+  double sum_squared_diff_full = 0.0;
+  double sum_squared_diff_partial = 0.0;
+  double sum_squared_diff_differences = 0.0;
+
+  for (size_t i = 0; i < n; ++i) {
+    sum_squared_diff_full +=
+        std::pow(impl->full_enqueue_durations[i] - full_mean, 2);
+    sum_squared_diff_partial +=
+        std::pow(impl->partial_enqueue_durations[i] - partial_mean, 2);
+    sum_squared_diff_differences += std::pow(differences[i] - diff_mean, 2);
+  }
+
+  // Calculate standard deviations
+  double full_stddev = std::sqrt(sum_squared_diff_full / n);
+  double partial_stddev = std::sqrt(sum_squared_diff_partial / n);
+  double diff_stddev = std::sqrt(sum_squared_diff_differences / n);
+
+  std::cout << "Full enqueue mean: " << full_mean << " ns" << std::endl;
+  std::cout << "Full enqueue stddev: " << full_stddev << " ns";
+  std::cout << " (" << (full_stddev / full_mean * 100.0) << "%)" << std::endl;
+
+  std::cout << "Partial enqueue mean: " << partial_mean << " ns" << std::endl;
+  std::cout << "Partial enqueue stddev: " << partial_stddev << " ns";
+  std::cout << " (" << (partial_stddev / partial_mean * 100.0) << "%)"
+            << std::endl;
+
+  std::cout << "Difference mean: " << diff_mean << " ns" << std::endl;
+  std::cout << "Difference stddev: " << diff_stddev << " ns";
+  if (diff_mean != 0.0) {
+    std::cout << " (" << (diff_stddev / std::abs(diff_mean) * 100.0) << "%)";
+  }
+  std::cout << std::endl;
+}
 void executable_command_graph::update(
     const command_graph<graph_state::modifiable> &Graph) {
   impl->update(sycl::detail::getSyclObjImpl(Graph));

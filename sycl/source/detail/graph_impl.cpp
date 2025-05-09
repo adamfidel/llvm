@@ -2019,8 +2019,8 @@ void dynamic_parameter_base::updateWorkGroupMem(size_t BufferSize) {
   impl->updateWorkGroupMem(BufferSize);
 }
 
-void dynamic_parameter_base::updateLocalAccessor(size_t BufferSize) {
-  impl->updateLocalAccessor(BufferSize);
+void dynamic_parameter_base::updateLocalAccessor(size_t& BufferSize, range<3>& AllocationSize) {
+  impl->updateLocalAccessor(BufferSize, AllocationSize);
 }
 
 void dynamic_parameter_impl::updateValue(const raw_kernel_arg *NewRawValue,
@@ -2097,12 +2097,12 @@ void dynamic_parameter_impl::updateWorkGroupMem(size_t BufferSize) {
   }
 }
 
-void dynamic_parameter_impl::updateLocalAccessor(size_t BufferSize) {
+void dynamic_parameter_impl::updateLocalAccessor(size_t& BufferSize, range<3>& AllocationSize) {
   for (auto &[NodeWeak, ArgIndex] : MNodes) {
     auto NodeShared = NodeWeak.lock();
     if (NodeShared) {
       dynamic_parameter_impl::updateCGLocalAccessor(NodeShared->MCommandGroup,
-                                                   ArgIndex, BufferSize);
+                                                   ArgIndex, BufferSize, AllocationSize);
     }
   }
 
@@ -2111,7 +2111,7 @@ void dynamic_parameter_impl::updateLocalAccessor(size_t BufferSize) {
     if (DynCG) {
       auto &CG = DynCG->MCommandGroups[DynCGInfo.CGIndex];
       dynamic_parameter_impl::updateCGLocalAccessor(CG, DynCGInfo.ArgIndex,
-                                                   BufferSize);
+                                                   BufferSize, AllocationSize);
     }
   }
 }
@@ -2131,7 +2131,7 @@ void dynamic_parameter_impl::updateCGWorkGroupMem(
 }
 
 void dynamic_parameter_impl::updateCGLocalAccessor(
-    std::shared_ptr<sycl::detail::CG> CG, int ArgIndex, size_t BufferSize) {
+    std::shared_ptr<sycl::detail::CG> CG, int ArgIndex, size_t& BufferSize, range<3>& AllocationSize) {
 
   auto &Args = static_cast<sycl::detail::CGExecKernel *>(CG.get())->MArgs;
   for (auto &Arg : Args) {
@@ -2140,6 +2140,9 @@ void dynamic_parameter_impl::updateCGLocalAccessor(
     }
     assert(Arg.MType == sycl::detail::kernel_param_kind_t::kind_std_layout);
     Arg.MSize = BufferSize;
+    Args[Arg.MIndex + 1].MPtr = new range<3>(AllocationSize);
+    Args[Arg.MIndex + 2].MPtr = new range<3>(AllocationSize);
+    Args[Arg.MIndex + 3].MPtr = new range<3>(AllocationSize);
     break;
   }
 }

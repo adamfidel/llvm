@@ -542,7 +542,7 @@ protected:
 
   void updateWorkGroupMem(size_t BufferSize);
 
-  void updateLocalAccessor(size_t BufferSize);
+  void updateLocalAccessor(size_t& BufferSize, range<3>& AllocationSize);
 
   std::shared_ptr<dynamic_parameter_impl> impl;
 
@@ -587,19 +587,21 @@ public:
   dynamic_local_accessor_base() = default;
 #ifndef __SYCL_DEVICE_ONLY__
   dynamic_local_accessor_base(
-      experimental::command_graph<graph_state::modifiable> Graph, size_t Size)
-      : dynamic_parameter_base(Graph), BufferSize(Size) {}
+      experimental::command_graph<graph_state::modifiable> Graph, sycl::range<3> AllocationSize, int Dims, int ElemSize)
+      : dynamic_parameter_base(Graph), AllocationSize(AllocationSize), Dims(Dims), ElemSize(ElemSize), BufferSize(AllocationSize.size() * ElemSize) {}
 #else
   dynamic_local_accessor_base(
-      experimental::command_graph<graph_state::modifiable> /*Graph*/,
-      size_t Size)
-      : BufferSize(Size) {}
+      experimental::command_graph<graph_state::modifiable> Graph, sycl::range<3> AllocationSize, int Dims, int ElemSize)
+      : AllocationSize(AllocationSize), Dims(Dims), ElemSize(ElemSize), BufferSize(AllocationSize.size() * ElemSize) {}
 #endif
 
-private:
+protected:
 #ifdef __SYCL_DEVICE_ONLY__
   [[maybe_unused]] unsigned char Padding[sizeof(dynamic_parameter_base)];
 #endif
+  range<3> AllocationSize;
+  int Dims;
+  int ElemSize;
   size_t BufferSize{};
   friend class sycl::handler;
 };
@@ -684,7 +686,7 @@ public:
   dynamic_local_accessor(
       experimental::command_graph<graph_state::modifiable> Graph, range<Dimensions> AllocationSize, const property_list &PropList = {})
       : detail::dynamic_local_accessor_base(
-            Graph, AllocationSize.size()) {}
+            Graph, detail::convertToArrayOfN<3, 1>(AllocationSize), Dimensions, sizeof(DataT)) {}
 
   local_accessor<DataT, Dimensions> get() const {
 #ifndef __SYCL_DEVICE_ONLY__
@@ -700,7 +702,9 @@ public:
   /// @param Num The new number of elements in the unbounded array.
   void update([[maybe_unused]] range<Dimensions> NewAllocationSize) {
 #ifndef __SYCL_DEVICE_ONLY__
-    detail::dynamic_parameter_base::updateWorkGroupMem(NewAllocationSize.size());
+    AllocationSize = detail::convertToArrayOfN<3, 1>(NewAllocationSize);
+    BufferSize = NewAllocationSize.size() * sizeof(DataT);
+    detail::dynamic_parameter_base::updateLocalAccessor(BufferSize, AllocationSize);
 #endif
   }
 

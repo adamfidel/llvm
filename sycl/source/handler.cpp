@@ -915,6 +915,41 @@ static void addArgsForGlobalAccessor(detail::Requirement *AccImpl, size_t Index,
   }
 }
 
+//static void addArgsForLocalAccessor(detail::LocalAccessorImplHost *LAcc, size_t Index,
+//                                    size_t &IndexShift,
+//                                    bool IsKernelCreatedFromSource,
+//                                    std::vector<detail::ArgDesc> &Args,
+//                                    bool IsESIMD) {
+//  using detail::kernel_param_kind_t;
+//
+//  range<3> &LAccSize = LAcc->MSize;
+//  const int Dims = LAcc->MDims;
+//  int SizeInBytes = LAcc->MElemSize;
+//  for (int I = 0; I < Dims; ++I)
+//    SizeInBytes *= LAccSize[I];
+//
+//  // Some backends do not accept zero-sized local memory arguments, so we
+//  // make it a minimum allocation of 1 byte.
+//  SizeInBytes = std::max(SizeInBytes, 1);
+//  Args.emplace_back(kernel_param_kind_t::kind_std_layout, nullptr,
+//                    SizeInBytes, Index + IndexShift);
+//  // TODO ESIMD currently does not suport MSize field passing yet
+//  // accessor::init for ESIMD-mode accessor has a single field, translated
+//  // to a single kernel argument set above.
+//  if (!IsESIMD && !IsKernelCreatedFromSource) {
+//    ++IndexShift;
+//    const size_t SizeAccField = (Dims == 0 ? 1 : Dims) * sizeof(LAccSize[0]);
+//    Args.emplace_back(kernel_param_kind_t::kind_std_layout, &LAccSize, SizeAccField,
+//                      Index + IndexShift);
+//    ++IndexShift;
+//    Args.emplace_back(kernel_param_kind_t::kind_std_layout, &LAccSize, SizeAccField,
+//                      Index + IndexShift);
+//    ++IndexShift;
+//    Args.emplace_back(kernel_param_kind_t::kind_std_layout, &LAccSize, SizeAccField,
+//                      Index + IndexShift);
+//  }
+//}
+
 void handler::processArg(void *Ptr, const detail::kernel_param_kind_t &Kind,
                          const int Size, const size_t Index, size_t &IndexShift,
                          bool IsKernelCreatedFromSource, bool IsESIMD) {
@@ -985,6 +1020,12 @@ void handler::processArg(void *Ptr, const detail::kernel_param_kind_t &Kind,
       break;
     }
     case access::target::local: {
+      //      detail::LocalAccessorImplHost *LAccImpl =
+      //          static_cast<detail::LocalAccessorImplHost *>(Ptr);
+      //
+      //      addArgsForLocalAccessor(
+      //          LAccImpl, Index, IndexShift, IsKernelCreatedFromSource, impl->MArgs, IsESIMD);
+
       detail::LocalAccessorImplHost *LAcc =
           static_cast<detail::LocalAccessorImplHost *>(Ptr);
 
@@ -997,7 +1038,7 @@ void handler::processArg(void *Ptr, const detail::kernel_param_kind_t &Kind,
       // make it a minimum allocation of 1 byte.
       SizeInBytes = std::max(SizeInBytes, 1);
       impl->MArgs.emplace_back(kernel_param_kind_t::kind_std_layout, nullptr,
-                               SizeInBytes, Index + IndexShift);
+                                                             SizeInBytes, Index + IndexShift);
       // TODO ESIMD currently does not suport MSize field passing yet
       // accessor::init for ESIMD-mode accessor has a single field, translated
       // to a single kernel argument set above.
@@ -1040,12 +1081,23 @@ void handler::processArg(void *Ptr, const detail::kernel_param_kind_t &Kind,
         static_cast<access::target>(Size & AccessTargetMask);
     switch (AccTarget) {
     case access::target::local: {
-      detail::LocalAccessorImplHost *LAcc =
-          static_cast<detail::LocalAccessorImplHost *>(Ptr);
 
-      range<3> &Size = LAcc->MSize;
-      const int Dims = LAcc->MDims;
-      int SizeInBytes = LAcc->MElemSize;
+      auto *DynBase = static_cast<
+          ext::oneapi::experimental::detail::dynamic_parameter_base *>(Ptr);
+
+      auto *DynLocalAccessorBase = static_cast<
+          ext::oneapi::experimental::detail::dynamic_local_accessor_base *>(Ptr);
+
+//      detail::LocalAccessorImplHost* LAccImplHost = new detail::LocalAccessorImplHost(DynLocalAccessorBase->AllocationSize, DynLocalAccessorBase->Dims, DynLocalAccessorBase->ElemSize, {});
+
+      registerDynamicParameter(*DynBase, Index + IndexShift);
+
+//      addArgsForLocalAccessor(
+//          &LAccImplHost, Index, IndexShift, IsKernelCreatedFromSource, impl->MArgs, IsESIMD);
+
+      range<3> &Size = DynLocalAccessorBase->AllocationSize;
+      const int Dims = DynLocalAccessorBase->Dims;
+      int SizeInBytes = DynLocalAccessorBase->ElemSize;
       for (int I = 0; I < Dims; ++I)
         SizeInBytes *= Size[I];
       // Some backends do not accept zero-sized local memory arguments, so we

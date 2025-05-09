@@ -1636,7 +1636,7 @@ public:
   /// called for dynamic_work_group_memory arguments parameter.
   /// @param BufferSize The total size in bytes of the new local_accessor
   /// array
-  void updateLocalAccessor(size_t BufferSize);
+  void updateLocalAccessor(size_t& BufferSize, range<3>& AllocationSize);
 
   /// Static helper function for updating command-group
   /// dynamic_work_group_memory arguments.
@@ -1654,7 +1654,7 @@ public:
   /// @param BufferSize The total size in bytes of the new local_accessor
   /// array
   static void updateCGLocalAccessor(std::shared_ptr<sycl::detail::CG> CG,
-                                   int ArgIndex, size_t BufferSize);
+                                   int ArgIndex, size_t& BufferSize, range<3>& AllocationSize);
 
   /// Static helper function for updating command-group value arguments.
   /// @param CG The command-group to update the argument information for.

@@ -37,6 +37,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
+#include <iostream>
 
 #include <array>
 #include <functional>
@@ -4859,8 +4860,18 @@ public:
           AccTy->getTemplateArgs()[1].getAsIntegral().getExtValue());
       int Info = getAccessTarget(FieldTy, AccTy) | (Dims << 11);
 
-      Header.addParamDesc(SYCLIntegrationHeader::kind_accessor, Info,
-                          CurOffset + offsetOf(FD, FieldTy));
+      // FIXME Simplify
+      if (SemaSYCL::isSyclType(FieldTy,
+                               SYCLTypeAttr::dynamic_local_accessor)) {
+        std::cout << "HERE B" << SemaSYCL::isSyclType(FieldTy,
+                                                      // FIXME Simplify
+                                                      SYCLTypeAttr::dynamic_local_accessor) << std::endl;
+        Header.addParamDesc(SYCLIntegrationHeader::kind_dynamic_accessor, Info,
+                            CurOffset + offsetOf(FD, FieldTy));
+      } else {
+        Header.addParamDesc(SYCLIntegrationHeader::kind_accessor, Info,
+                            CurOffset + offsetOf(FD, FieldTy));
+      }
     } else if (SemaSYCL::isSyclType(FieldTy, SYCLTypeAttr::stream)) {
       addParam(FD, FieldTy, SYCLIntegrationHeader::kind_stream);
     } else if (SemaSYCL::isSyclType(FieldTy, SYCLTypeAttr::work_group_memory)) {
@@ -6022,6 +6033,7 @@ static const char *paramKind2Str(KernelParamKind K) {
     CASE(pointer);
     CASE(work_group_memory);
     CASE(dynamic_work_group_memory);
+    CASE(dynamic_accessor);
   }
   return "<ERROR>";
 

@@ -901,6 +901,9 @@ void queue_impl::wait(const detail::code_location &CodeLoc) {
     // Add a barrier node to the graph to create a partition point.
     // TODO: test if partitioned wait bits are set
     if (GraphImpl) {
+//#define PARTITIONED_WAIT_IMPL_BARRIERS 1
+#define PARTITIONED_WAIT_IMPL_EMPTY_NODE 1
+#if PARTITIONED_WAIT_IMPL_BARRIERS
       std::vector<detail::EventImplPtr> EmptyWaitList;
       auto BarrierCG = std::make_shared<detail::CGBarrier>(
           std::move(EmptyWaitList),
@@ -918,6 +921,20 @@ void queue_impl::wait(const detail::code_location &CodeLoc) {
       );
 
       GraphImpl->setBarrierDep(shared_from_this(), BarrierNode);
+#elif PARTITIONED_WAIT_IMPL_EMPTY_NODE
+      auto EmptyCG = std::make_shared<detail::CG>(
+          detail::CGType::None,
+          detail::CG::StorageInitHelper{},
+          CodeLoc
+      );
+
+      std::vector<ext::oneapi::experimental::detail::node_impl *> EmptyDeps;
+      ext::oneapi::experimental::detail::node_impl &EmptyNode = GraphImpl->add(
+          ext::oneapi::experimental::node_type::empty,
+          EmptyCG,
+          EmptyDeps
+      );
+#endif
     }
     return;
   }

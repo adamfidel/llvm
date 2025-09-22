@@ -10,6 +10,9 @@
 #include <detail/event_impl.hpp>
 #include <detail/memory_manager.hpp>
 #include <detail/queue_impl.hpp>
+#include <detail/cg.hpp>
+#include <detail/graph/graph_impl.hpp>
+#include <detail/graph/node_impl.hpp>
 #include <sycl/context.hpp>
 #include <sycl/detail/common.hpp>
 #include <sycl/detail/ur.hpp>
@@ -893,9 +896,30 @@ void queue_impl::wait(const detail::code_location &CodeLoc) {
 #endif
 
   if (!MGraph.expired()) {
-    throw sycl::exception(make_error_code(errc::invalid),
-                          "wait cannot be called for a queue which is "
-                          "recording to a command graph.");
+    auto GraphImpl = MGraph.lock();
+
+    // Add a barrier node to the graph to create a partition point.
+    // TODO: test if partitioned wait bits are set
+    if (GraphImpl) {
+      std::vector<detail::EventImplPtr> EmptyWaitList;
+      auto BarrierCG = std::make_shared<detail::CGBarrier>(
+          std::move(EmptyWaitList),
+          ext::oneapi::experimental::event_mode_enum::none,
+          detail::CG::StorageInitHelper{},
+          detail::CGType::BarrierWaitlist,
+          CodeLoc
+      );
+
+      std::vector<ext::oneapi::experimental::detail::node_impl *> EmptyDeps;
+      ext::oneapi::experimental::detail::node_impl &BarrierNode = GraphImpl->add(
+          ext::oneapi::experimental::node_type::ext_oneapi_barrier,
+          std::static_pointer_cast<detail::CG>(BarrierCG),
+          EmptyDeps
+      );
+
+      GraphImpl->setBarrierDep(shared_from_this(), BarrierNode);
+    }
+    return;
   }
 
   // If there is an external event set, we know we are using an in-order queue

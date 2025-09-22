@@ -82,7 +82,7 @@ int main() {
     int expected_a = static_cast<int>(i);
     int expected_b = expected_a * 2;
     int expected_c = expected_b + 1;
-    int expected_d = 7 * expected_a + 3;
+    int expected_d = expected_c * 3 + expected_a;
 
     assert(check_value(i, expected_a, OutputA[i], "A"));
     assert(check_value(i, expected_b, OutputB[i], "B"));
@@ -90,7 +90,7 @@ int main() {
     assert(check_value(i, expected_d, OutputD[i], "D"));
   }
 
-  // Reset data
+  // Reset data and verify with new input
   Queue.submit([&](handler &CGH) {
     CGH.parallel_for(N, [=](id<1> it) {
       A[it] = static_cast<int>(it) + 10; // Different input
@@ -103,7 +103,6 @@ int main() {
   Queue.submit([&](handler &CGH) { CGH.ext_oneapi_graph(ExecGraph); });
   Queue.wait_and_throw();
 
-  // Verify second execution
   Queue.memcpy(OutputA.data(), A, N * sizeof(int)).wait();
   Queue.memcpy(OutputB.data(), B, N * sizeof(int)).wait();
   Queue.memcpy(OutputC.data(), C, N * sizeof(int)).wait();
@@ -113,7 +112,7 @@ int main() {
     int expected_a = static_cast<int>(i) + 10;
     int expected_b = expected_a * 2;
     int expected_c = expected_b + 1;
-    int expected_d = 7 * expected_a + 3;
+    int expected_d = expected_c * 3 + expected_a;
 
     assert(check_value(i, expected_a, OutputA[i], "A (second execution)"));
     assert(check_value(i, expected_b, OutputB[i], "B (second execution)"));
@@ -121,7 +120,6 @@ int main() {
     assert(check_value(i, expected_d, OutputD[i], "D (second execution)"));
   }
 
-  // Clean up
   sycl::free(A, Queue);
   sycl::free(B, Queue);
   sycl::free(C, Queue);

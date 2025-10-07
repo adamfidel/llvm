@@ -1060,9 +1060,9 @@ exec_graph_impl::~exec_graph_impl() {
 
 // Clean up any execution events which have finished so we don't pass them
 // to the scheduler.
-static void cleanupExecutionEvents(std::vector<sycl::detail::EventImplPtr> &ExecutionEvents) {
+static void cleanupExecutionEvents(std::vector<EventImplPtr> &ExecutionEvents) {
 
-  auto Predicate = [](sycl::detail::EventImplPtr &EventPtr) {
+  auto Predicate = [](EventImplPtr &EventPtr) {
     return EventPtr->isCompleted();
   };
 
@@ -1071,7 +1071,7 @@ static void cleanupExecutionEvents(std::vector<sycl::detail::EventImplPtr> &Exec
       ExecutionEvents.end());
 }
 
-sycl::detail::EventImplPtr exec_graph_impl::enqueueHostTaskPartition(
+EventImplPtr exec_graph_impl::enqueueHostTaskPartition(
     std::shared_ptr<partition> &Partition, sycl::detail::queue_impl &Queue,
     sycl::detail::CG::StorageInitHelper CGData, bool EventNeeded) {
 
@@ -1109,7 +1109,7 @@ sycl::detail::EventImplPtr exec_graph_impl::enqueueHostTaskPartition(
   return nullptr;
 }
 
-sycl::detail::EventImplPtr exec_graph_impl::enqueuePartitionWithScheduler(
+EventImplPtr exec_graph_impl::enqueuePartitionWithScheduler(
     std::shared_ptr<partition> &Partition, sycl::detail::queue_impl &Queue,
     sycl::detail::CG::StorageInitHelper CGData, bool EventNeeded) {
 
@@ -1139,7 +1139,7 @@ sycl::detail::EventImplPtr exec_graph_impl::enqueuePartitionWithScheduler(
   return nullptr;
 }
 
-sycl::detail::EventImplPtr exec_graph_impl::enqueuePartitionDirectly(
+EventImplPtr exec_graph_impl::enqueuePartitionDirectly(
     std::shared_ptr<partition> &Partition, sycl::detail::queue_impl &Queue,
     std::vector<detail::EventImplPtr> &WaitEvents, bool EventNeeded) {
 
@@ -1179,7 +1179,7 @@ sycl::detail::EventImplPtr exec_graph_impl::enqueuePartitionDirectly(
   }
 }
 
-sycl::detail::EventImplPtr
+EventImplPtr
 exec_graph_impl::enqueuePartitions(sycl::detail::queue_impl &Queue,
                                    sycl::detail::CG::StorageInitHelper &CGData,
                                    bool IsCGDataSafeForSchedulerBypass,

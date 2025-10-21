@@ -466,6 +466,8 @@ public:
     case node_type::host_task:
     case node_type::ext_oneapi_barrier:
     case node_type::empty:
+    case node_type::async_malloc:
+    case node_type::async_free:
       return true;
 
     default:

@@ -1399,10 +1399,13 @@ void exec_graph_impl::duplicateNodes() {
 }
 
 void exec_graph_impl::update(std::shared_ptr<graph_impl> GraphImpl) {
+  const bool UpdateMemPool = MGraphImpl->getMemPool().hasAllocations();
   // Naive prototype for async malloc / free support: free our current memory
   // and steal the new graph_impl for its memory pool. TODO: What other side
   // effects does this have?
-  MGraphImpl->getMemPool().deallocateAndUnmapAll();
+  if (UpdateMemPool) {
+    MGraphImpl->getMemPool().deallocateAndUnmapAll();
+  }
   if (MDevice != GraphImpl->getDevice()) {
     throw sycl::exception(
         sycl::make_error_code(errc::invalid),
@@ -1465,8 +1468,12 @@ void exec_graph_impl::update(std::shared_ptr<graph_impl> GraphImpl) {
     MIDCache.insert(
         std::make_pair(GraphImpl->MNodeStorage[i]->MID, MNodeStorage[i].get()));
   }
-  MGraphImpl = GraphImpl;
-  finalizeMemoryAllocations();
+  // By refinalizing allocations, update will propagate correct pointers throughout based on the new MGraphImpl.
+  // TODO: examine side effects of reassigning MGraphImpl.
+  if (UpdateMemPool) {
+      MGraphImpl = GraphImpl;
+      finalizeMemoryAllocations();
+  }
   update(GraphImpl->nodes());
 }
 

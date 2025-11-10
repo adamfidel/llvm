@@ -450,7 +450,7 @@ inline void execute_graph(handler &CGH,
 inline void execute_graph(queue Q, command_graph<graph_state::executable> &G,
                           const sycl::detail::code_location &CodeLoc =
                               sycl::detail::code_location::current()) {
-  submit(std::move(Q), [&](handler &CGH) { execute_graph(CGH, G); }, CodeLoc);
+  detail::submit_graph_direct(std::move(Q), G, CodeLoc);
 }
 
 } // namespace ext::oneapi::experimental

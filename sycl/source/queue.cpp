@@ -537,6 +537,24 @@ template void __SYCL_EXPORT submit_kernel_direct_without_event_impl<3>(
     const detail::KernelPropertyHolderStructTy &Props,
     const detail::code_location &CodeLoc, bool IsTopCodeLoc);
 
+event submit_graph_direct_with_event_impl(
+    const queue &Queue,
+    ext::oneapi::experimental::command_graph<
+        ext::oneapi::experimental::graph_state::executable> &G,
+    const detail::code_location &CodeLoc, bool IsTopCodeLoc) {
+  return getSyclObjImpl(Queue)->submit_graph_direct_with_event(
+      *getSyclObjImpl(G), CodeLoc, IsTopCodeLoc);
+}
+
+void submit_graph_direct_without_event_impl(
+    const queue &Queue,
+    ext::oneapi::experimental::command_graph<
+        ext::oneapi::experimental::graph_state::executable> &G,
+    const detail::code_location &CodeLoc, bool IsTopCodeLoc) {
+  getSyclObjImpl(Queue)->submit_graph_direct_without_event(
+      *getSyclObjImpl(G), CodeLoc, IsTopCodeLoc);
+}
+
 } // namespace _V1
 } // namespace sycl
 

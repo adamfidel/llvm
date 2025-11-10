@@ -82,6 +82,18 @@ void __SYCL_EXPORT submit_kernel_direct_without_event_impl(
     const detail::KernelPropertyHolderStructTy &Props,
     const detail::code_location &CodeLoc, bool IsTopCodeLoc);
 
+event __SYCL_EXPORT submit_graph_direct_with_event_impl(
+    const queue &Queue,
+    ext::oneapi::experimental::command_graph<
+        ext::oneapi::experimental::graph_state::executable> &G,
+    const detail::code_location &CodeLoc, bool IsTopCodeLoc);
+
+void __SYCL_EXPORT submit_graph_direct_without_event_impl(
+    const queue &Queue,
+    ext::oneapi::experimental::command_graph<
+        ext::oneapi::experimental::graph_state::executable> &G,
+    const detail::code_location &CodeLoc, bool IsTopCodeLoc);
+
 namespace detail {
 class queue_impl;
 
@@ -161,6 +173,26 @@ private:
 };
 
 } // namespace v1
+
+// Matt todo: implement in queue.cpp
+template <bool EventNeeded = false>
+auto submit_graph_direct(
+    const queue &Q,
+    ext::oneapi::experimental::command_graph<
+        ext::oneapi::experimental::graph_state::executable> &G,
+    const sycl::detail::code_location &CodeLoc =
+        sycl::detail::code_location::current()) {
+  detail::tls_code_loc_t TlsCodeLocCapture(CodeLoc);
+  if constexpr (EventNeeded) {
+    return submit_graph_direct_with_event_impl(std::move(Q), G,
+                                               TlsCodeLocCapture.query(),
+                                               TlsCodeLocCapture.isToplevel());
+  } else {
+    return submit_graph_direct_without_event_impl(
+        std::move(Q), G, TlsCodeLocCapture.query(),
+        TlsCodeLocCapture.isToplevel());
+  }
+}
 
 template <detail::WrapAs WrapAs, typename LambdaArgType,
           typename KernelName = detail::auto_name, bool EventNeeded = false,
@@ -3706,7 +3738,8 @@ public:
           ext::oneapi::experimental::graph_state::executable>
           Graph,
       const detail::code_location &CodeLoc = detail::code_location::current()) {
-    return submit([&](handler &CGH) { CGH.ext_oneapi_graph(Graph); }, CodeLoc);
+    return detail::submit_graph_direct</*EventNeeded*/ true>(*this, Graph,
+                                                             CodeLoc);
   }
 
   /// Shortcut for executing a graph of commands with a single dependency.

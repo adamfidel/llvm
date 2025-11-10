@@ -622,6 +622,53 @@ EventImplPtr queue_impl::submit_kernel_direct_impl(
   return submit_direct(CallerNeedsEvent, DepEvents, SubmitKernelFunc);
 }
 
+EventImplPtr queue_impl::submit_graph_direct_impl(
+    ext::oneapi::experimental::detail::exec_graph_impl &G,
+    bool CallerNeedsEvent, const detail::code_location &CodeLoc,
+    bool IsTopCodeLoc) {
+  detail::CG::StorageInitHelper CGData;
+  std::unique_lock<std::mutex> Lock(MMutex);
+  // Event needed for cleanup with out-of-order queue
+  bool EventNeeded = !isInOrder() || CallerNeedsEvent;
+  // Used by queue_empty() and getLastEvent()
+  MEmpty.store(false, std::memory_order_release);
+
+  // Sync with an external event
+  std::optional<event> ExternalEvent = popExternalEvent();
+  if (ExternalEvent) {
+    CGData.MEvents.push_back(getSyclObjImpl(*ExternalEvent));
+  }
+
+  auto &Deps = hasCommandGraph() ? MExtGraphDeps : MDefaultGraphDeps;
+
+  // Sync with the last event for in order queue
+  EventImplPtr &LastEvent = Deps.LastEventPtr;
+  if (isInOrder() && LastEvent) {
+    CGData.MEvents.push_back(LastEvent);
+  }
+
+  // Barrier and un-enqueued commands synchronization for out or order queue
+  if (!isInOrder()) {
+    MMissedCleanupRequests.unset(
+        [&](MissedCleanupRequestsType &MissedCleanupRequests) {
+          for (auto &UpdatedGraph : MissedCleanupRequests)
+            doUnenqueuedCommandCleanup(UpdatedGraph);
+          MissedCleanupRequests.clear();
+        });
+
+    if (Deps.LastBarrier && !Deps.LastBarrier->isEnqueued()) {
+      CGData.MEvents.push_back(Deps.LastBarrier);
+    }
+  }
+
+  auto EventImpl = G.enqueue(*this, std::move(CGData), EventNeeded);
+  // Barrier and un-enqueued commands synchronization for out or order queue
+  if (!isInOrder() && !EventImpl->isEnqueued()) {
+    Deps.UnenqueuedCmdEvents.push_back(EventImpl);
+  }
+  return CallerNeedsEvent ? EventImpl : nullptr;
+}
+
 template <typename SubmitCommandFuncType>
 detail::EventImplPtr
 queue_impl::submit_direct(bool CallerNeedsEvent,

@@ -385,6 +385,19 @@ public:
                               CodeLoc, IsTopCodeLoc);
   }
 
+  void submit_graph_direct_without_event(
+      ext::oneapi::experimental::detail::exec_graph_impl &G,
+      const detail::code_location &CodeLoc, bool IsTopCodeLoc) {
+    submit_graph_direct_impl(G, false, CodeLoc, IsTopCodeLoc);
+  }
+
+  event submit_graph_direct_with_event(
+      ext::oneapi::experimental::detail::exec_graph_impl &G,
+      const detail::code_location &CodeLoc, bool IsTopCodeLoc) {
+    return createSyclObjFromImpl<event>(
+        submit_graph_direct_impl(G, true, CodeLoc, IsTopCodeLoc));
+  }
+
   void submit_without_event(const detail::type_erased_cgfo_ty &CGF,
                             const v1::SubmissionInfo &SubmitInfo,
                             const detail::code_location &Loc,
@@ -921,6 +934,11 @@ protected:
       sycl::span<const event> DepEvents,
       const detail::KernelPropertyHolderStructTy &Props,
       const detail::code_location &CodeLoc, bool IsTopCodeLoc);
+
+  EventImplPtr submit_graph_direct_impl(
+      ext::oneapi::experimental::detail::exec_graph_impl &G,
+      bool CallerNeedsEvent, const detail::code_location &CodeLoc,
+      bool IsTopCodeLoc);
 
   template <typename SubmitCommandFuncType>
   EventImplPtr submit_direct(bool CallerNeedsEvent,

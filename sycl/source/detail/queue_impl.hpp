@@ -387,15 +387,17 @@ public:
 
   void submit_graph_direct_without_event(
       ext::oneapi::experimental::detail::exec_graph_impl &G,
-      const detail::code_location &CodeLoc, bool IsTopCodeLoc) {
-    submit_graph_direct_impl(G, false, CodeLoc, IsTopCodeLoc);
+      sycl::span<const event> DepEvents, const detail::code_location &CodeLoc,
+      bool IsTopCodeLoc) {
+    submit_graph_direct_impl(G, false, DepEvents, CodeLoc, IsTopCodeLoc);
   }
 
   event submit_graph_direct_with_event(
       ext::oneapi::experimental::detail::exec_graph_impl &G,
-      const detail::code_location &CodeLoc, bool IsTopCodeLoc) {
+      sycl::span<const event> DepEvents, const detail::code_location &CodeLoc,
+      bool IsTopCodeLoc) {
     return createSyclObjFromImpl<event>(
-        submit_graph_direct_impl(G, true, CodeLoc, IsTopCodeLoc));
+        submit_graph_direct_impl(G, true, DepEvents, CodeLoc, IsTopCodeLoc));
   }
 
   void submit_without_event(const detail::type_erased_cgfo_ty &CGF,
@@ -937,12 +939,13 @@ protected:
 
   EventImplPtr submit_graph_direct_impl(
       ext::oneapi::experimental::detail::exec_graph_impl &G,
-      bool CallerNeedsEvent, const detail::code_location &CodeLoc,
-      bool IsTopCodeLoc);
+      bool CallerNeedsEvent, sycl::span<const event> DepEvents,
+      const detail::code_location &CodeLoc, bool IsTopCodeLoc);
 
   template <typename SubmitCommandFuncType>
   EventImplPtr submit_direct(bool CallerNeedsEvent,
                              sycl::span<const event> DepEvents,
+                             bool CommandFuncContainsHostTask,
                              SubmitCommandFuncType &SubmitCommandFunc);
 
   /// Helper function for submitting a memory operation with a handler.

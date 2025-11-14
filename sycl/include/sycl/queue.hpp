@@ -86,13 +86,15 @@ event __SYCL_EXPORT submit_graph_direct_with_event_impl(
     const queue &Queue,
     ext::oneapi::experimental::command_graph<
         ext::oneapi::experimental::graph_state::executable> &G,
-    const detail::code_location &CodeLoc, bool IsTopCodeLoc);
+    sycl::span<const event> DepEvents, const detail::code_location &CodeLoc,
+    bool IsTopCodeLoc);
 
 void __SYCL_EXPORT submit_graph_direct_without_event_impl(
     const queue &Queue,
     ext::oneapi::experimental::command_graph<
         ext::oneapi::experimental::graph_state::executable> &G,
-    const detail::code_location &CodeLoc, bool IsTopCodeLoc);
+    sycl::span<const event> DepEvents, const detail::code_location &CodeLoc,
+    bool IsTopCodeLoc);
 
 namespace detail {
 class queue_impl;
@@ -180,16 +182,17 @@ auto submit_graph_direct(
     const queue &Q,
     ext::oneapi::experimental::command_graph<
         ext::oneapi::experimental::graph_state::executable> &G,
+    sycl::span<const event> DepEvents,
     const sycl::detail::code_location &CodeLoc =
         sycl::detail::code_location::current()) {
   detail::tls_code_loc_t TlsCodeLocCapture(CodeLoc);
   if constexpr (EventNeeded) {
-    return submit_graph_direct_with_event_impl(std::move(Q), G,
+    return submit_graph_direct_with_event_impl(std::move(Q), G, DepEvents,
                                                TlsCodeLocCapture.query(),
                                                TlsCodeLocCapture.isToplevel());
   } else {
     return submit_graph_direct_without_event_impl(
-        std::move(Q), G, TlsCodeLocCapture.query(),
+        std::move(Q), G, DepEvents, TlsCodeLocCapture.query(),
         TlsCodeLocCapture.isToplevel());
   }
 }
@@ -3738,8 +3741,8 @@ public:
           ext::oneapi::experimental::graph_state::executable>
           Graph,
       const detail::code_location &CodeLoc = detail::code_location::current()) {
-    return detail::submit_graph_direct</*EventNeeded*/ true>(*this, Graph,
-                                                             CodeLoc);
+    return detail::submit_graph_direct</*EventNeeded*/ true>(
+        *this, Graph, /*DepEvents*/ {}, CodeLoc);
   }
 
   /// Shortcut for executing a graph of commands with a single dependency.
@@ -3754,12 +3757,8 @@ public:
           Graph,
       event DepEvent,
       const detail::code_location &CodeLoc = detail::code_location::current()) {
-    return submit(
-        [&](handler &CGH) {
-          CGH.depends_on(DepEvent);
-          CGH.ext_oneapi_graph(Graph);
-        },
-        CodeLoc);
+    return detail::submit_graph_direct</*EventNeeded*/ true>(
+        *this, Graph, sycl::span<const event>(&DepEvent, 1), CodeLoc);
   }
 
   /// Shortcut for executing a graph of commands with multiple dependencies.
@@ -3774,12 +3773,8 @@ public:
           Graph,
       const std::vector<event> &DepEvents,
       const detail::code_location &CodeLoc = detail::code_location::current()) {
-    return submit(
-        [&](handler &CGH) {
-          CGH.depends_on(DepEvents);
-          CGH.ext_oneapi_graph(Graph);
-        },
-        CodeLoc);
+    return detail::submit_graph_direct</*EventNeeded*/ true>(
+        *this, Graph, DepEvents, CodeLoc);
   }
 
   /// Provides a hint to the  runtime that previously issued commands to this

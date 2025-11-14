@@ -541,18 +541,20 @@ event submit_graph_direct_with_event_impl(
     const queue &Queue,
     ext::oneapi::experimental::command_graph<
         ext::oneapi::experimental::graph_state::executable> &G,
-    const detail::code_location &CodeLoc, bool IsTopCodeLoc) {
+    sycl::span<const event> DepEvents, const detail::code_location &CodeLoc,
+    bool IsTopCodeLoc) {
   return getSyclObjImpl(Queue)->submit_graph_direct_with_event(
-      *getSyclObjImpl(G), CodeLoc, IsTopCodeLoc);
+      *getSyclObjImpl(G), DepEvents, CodeLoc, IsTopCodeLoc);
 }
 
 void submit_graph_direct_without_event_impl(
     const queue &Queue,
     ext::oneapi::experimental::command_graph<
         ext::oneapi::experimental::graph_state::executable> &G,
-    const detail::code_location &CodeLoc, bool IsTopCodeLoc) {
+    sycl::span<const event> DepEvents, const detail::code_location &CodeLoc,
+    bool IsTopCodeLoc) {
   getSyclObjImpl(Queue)->submit_graph_direct_without_event(
-      *getSyclObjImpl(G), CodeLoc, IsTopCodeLoc);
+      *getSyclObjImpl(G), DepEvents, CodeLoc, IsTopCodeLoc);
 }
 
 } // namespace _V1

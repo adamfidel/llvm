@@ -8,6 +8,7 @@
 
 #include "../graph_common.hpp"
 
+#include <sycl/ext/oneapi/experimental/enqueue_functions.hpp>
 #include <sycl/properties/all_properties.hpp>
 
 int main() {
@@ -39,7 +40,7 @@ int main() {
   Queue.submit(
       [&](handler &CGH) { CGH.parallel_for(N, [=](id<1> it) { X[it] = 1; }); });
 
-  Queue.submit([&](handler &CGH) { CGH.ext_oneapi_graph(ExecSubGraph); });
+  exp_ext::execute_graph(Queue, ExecSubGraph);
 
   Queue.submit([&](handler &CGH) {
     CGH.parallel_for(range<1>{N}, [=](id<1> it) { X[it] += 3; });

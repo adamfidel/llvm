@@ -544,7 +544,7 @@ event submit_graph_direct_with_event_impl(
     sycl::span<const event> DepEvents, const detail::code_location &CodeLoc,
     bool IsTopCodeLoc) {
   return getSyclObjImpl(Queue)->submit_graph_direct_with_event(
-      *getSyclObjImpl(G), DepEvents, CodeLoc, IsTopCodeLoc);
+      getSyclObjImpl(G), DepEvents, CodeLoc, IsTopCodeLoc);
 }
 
 void submit_graph_direct_without_event_impl(
@@ -554,7 +554,7 @@ void submit_graph_direct_without_event_impl(
     sycl::span<const event> DepEvents, const detail::code_location &CodeLoc,
     bool IsTopCodeLoc) {
   getSyclObjImpl(Queue)->submit_graph_direct_without_event(
-      *getSyclObjImpl(G), DepEvents, CodeLoc, IsTopCodeLoc);
+      getSyclObjImpl(G), DepEvents, CodeLoc, IsTopCodeLoc);
 }
 
 } // namespace _V1

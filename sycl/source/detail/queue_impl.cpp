@@ -574,16 +574,23 @@ EventImplPtr queue_impl::submit_kernel_direct_impl(
   KData.validateAndSetKernelLaunchProperties(Props, hasCommandGraph(),
                                              getDeviceImpl());
 
-  auto SubmitKernelFunc = [&](detail::CG::StorageInitHelper &CGData,
-                              bool SchedulerBypass) -> EventImplPtr {
+  auto SubmitKernelFunc = [&](detail::CG::StorageInitHelper &CGData)
+      -> std::pair<EventImplPtr, bool> {
+    bool SchedulerBypass =
+        (CGData.MEvents.size() > 0
+             ? detail::Scheduler::areEventsSafeForSchedulerBypass(
+                   CGData.MEvents, getContextImpl())
+             : true) &&
+        !hasCommandGraph();
     if (SchedulerBypass) {
       // No need to copy/move the kernel function, so we set
       // the function pointer to the original function
       KData.setKernelFunc(HostKernel.getPtr());
 
-      return submit_kernel_scheduler_bypass(KData, CGData.MEvents,
-                                            CallerNeedsEvent, nullptr, nullptr,
-                                            CodeLoc, IsTopCodeLoc);
+      return {submit_kernel_scheduler_bypass(KData, CGData.MEvents,
+                                             CallerNeedsEvent, nullptr, nullptr,
+                                             CodeLoc, IsTopCodeLoc),
+              SchedulerBypass};
     }
     std::unique_ptr<detail::CG> CommandGroup;
     std::vector<std::shared_ptr<detail::stream_impl>> StreamStorage;
@@ -611,12 +618,14 @@ EventImplPtr queue_impl::submit_kernel_direct_impl(
     CommandGroup->MIsTopCodeLoc = IsTopCodeLoc;
 
     if (auto GraphImpl = getCommandGraph(); GraphImpl) {
-      return submit_command_to_graph(*GraphImpl, std::move(CommandGroup),
-                                     detail::CGType::Kernel);
+      return {submit_command_to_graph(*GraphImpl, std::move(CommandGroup),
+                                      detail::CGType::Kernel),
+              SchedulerBypass};
     }
 
-    return detail::Scheduler::getInstance().addCG(std::move(CommandGroup),
-                                                  *this, true);
+    return {detail::Scheduler::getInstance().addCG(std::move(CommandGroup),
+                                                   *this, true),
+            SchedulerBypass};
   };
 
   return submit_direct(CallerNeedsEvent, DepEvents, false, SubmitKernelFunc);
@@ -627,13 +636,12 @@ EventImplPtr queue_impl::submit_graph_direct_impl(
     bool CallerNeedsEvent, sycl::span<const event> DepEvents,
     const detail::code_location &CodeLoc, bool IsTopCodeLoc) {
   bool EventNeeded = !isInOrder() || CallerNeedsEvent;
-  auto SubmitGraphFunc = [&](detail::CG::StorageInitHelper &CGData,
-                             bool SchedulerBypass) -> EventImplPtr {
+  auto SubmitGraphFunc = [&](detail::CG::StorageInitHelper &CGData)
+      -> std::pair<EventImplPtr, bool> {
     if (auto ParentGraph = getCommandGraph(); ParentGraph) {
       std::unique_ptr<detail::CG> CommandGroup;
       {
-        // Matt TODO: Is this lock needed?
-        ext::oneapi::experimental::detail::graph_impl::WriteLock ParentLock(
+        ext::oneapi::experimental::detail::graph_impl::ReadLock ParentLock(
             ParentGraph->MMutex);
         CGData.MRequirements = G->getRequirements();
         // Here we are using the CommandGroup without passing a CommandBuffer to
@@ -643,11 +651,11 @@ EventImplPtr queue_impl::submit_graph_direct_impl(
             new sycl::detail::CGExecCommandBuffer(nullptr, G, CGData));
       }
       CommandGroup->MIsTopCodeLoc = IsTopCodeLoc;
-      return submit_command_to_graph(*ParentGraph, std::move(CommandGroup),
-                                     detail::CGType::ExecCommandBuffer);
+      return {submit_command_to_graph(*ParentGraph, std::move(CommandGroup),
+                                      detail::CGType::ExecCommandBuffer),
+              false};
     } else {
-      auto EventImpl = G->enqueue(*this, CGData, EventNeeded);
-      return EventImpl;
+      return G->enqueue(*this, CGData, EventNeeded);
     }
   };
   return submit_direct(CallerNeedsEvent, DepEvents, G->containsHostTask(),
@@ -719,20 +727,13 @@ queue_impl::submit_direct(bool CallerNeedsEvent,
     }
   }
 
-  bool SchedulerBypass =
-      (CGData.MEvents.size() > 0
-           ? detail::Scheduler::areEventsSafeForSchedulerBypass(
-                 CGData.MEvents, getContextImpl())
-           : true) &&
-      !hasCommandGraph();
+  auto [EventImpl, SchedulerBypass] = SubmitCommandFunc(CGData);
 
   // Synchronize with the "no last event mode", used by the handler-based
   // kernel submit path
   MNoLastEventMode.store(isInOrder() && SchedulerBypass &&
                              !CommandFuncContainsHostTask,
                          std::memory_order_relaxed);
-
-  EventImplPtr EventImpl = SubmitCommandFunc(CGData, SchedulerBypass);
 
   // Sync with the last event for in order queue. For scheduler-bypass flow,
   // the ordering is done at the layers below the SYCL runtime,

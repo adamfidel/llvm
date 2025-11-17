@@ -1204,7 +1204,7 @@ exec_graph_impl::enqueuePartitions(sycl::detail::queue_impl &Queue,
   return SignalEvent;
 }
 
-EventImplPtr
+std::pair<EventImplPtr, bool>
 exec_graph_impl::enqueue(sycl::detail::queue_impl &Queue,
                          sycl::detail::CG::StorageInitHelper CGData,
                          bool EventNeeded) {
@@ -1213,19 +1213,16 @@ exec_graph_impl::enqueue(sycl::detail::queue_impl &Queue,
   cleanupExecutionEvents(MSchedulerDependencies);
   CGData.MEvents.insert(CGData.MEvents.end(), MSchedulerDependencies.begin(),
                         MSchedulerDependencies.end());
-
-  bool IsCGDataSafeForSchedulerBypass =
-      detail::Scheduler::areEventsSafeForSchedulerBypass(
-          CGData.MEvents, Queue.getContextImpl()) &&
-      CGData.MRequirements.empty();
+  // Check if CGData is safe for scheduler bypass
+  bool SkipScheduler = detail::Scheduler::areEventsSafeForSchedulerBypass(
+                           CGData.MEvents, Queue.getContextImpl()) &&
+                       CGData.MRequirements.empty();
 
   // This variable represents the returned event. It will always be nullptr if
   // EventNeeded is false.
   EventImplPtr SignalEvent;
-
   if (!MContainsHostTask) {
-    bool SkipScheduler =
-        IsCGDataSafeForSchedulerBypass && MPartitions[0]->MRequirements.empty();
+    SkipScheduler = SkipScheduler && MPartitions[0]->MRequirements.empty();
     if (SkipScheduler) {
       SignalEvent = enqueuePartitionDirectly(MPartitions[0], Queue,
                                              CGData.MEvents, EventNeeded);
@@ -1250,15 +1247,14 @@ exec_graph_impl::enqueue(sycl::detail::queue_impl &Queue,
       }
     }
   } else {
-    SignalEvent = enqueuePartitions(
-        Queue, CGData, IsCGDataSafeForSchedulerBypass, EventNeeded);
+    SignalEvent = enqueuePartitions(Queue, CGData, SkipScheduler, EventNeeded);
   }
 
   if (EventNeeded) {
     SignalEvent->setProfilingEnabled(MEnableProfiling);
   }
 
-  return SignalEvent;
+  return {SignalEvent, SkipScheduler};
 }
 
 void exec_graph_impl::duplicateNodes() {

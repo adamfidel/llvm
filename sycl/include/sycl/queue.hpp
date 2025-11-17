@@ -176,7 +176,6 @@ private:
 
 } // namespace v1
 
-// Matt todo: implement in queue.cpp
 template <bool EventNeeded = false>
 auto submit_graph_direct(
     const queue &Q,

@@ -628,7 +628,8 @@ EventImplPtr queue_impl::submit_kernel_direct_impl(
             SchedulerBypass};
   };
 
-  return submit_direct(CallerNeedsEvent, DepEvents, false, SubmitKernelFunc);
+  return submit_direct(CallerNeedsEvent, DepEvents,
+                       /*CommandFuncContainsHostTask*/ false, SubmitKernelFunc);
 }
 
 EventImplPtr queue_impl::submit_graph_direct_impl(
@@ -695,11 +696,7 @@ queue_impl::submit_direct(bool CallerNeedsEvent,
   } else if (isInOrder() && MNoLastEventMode && CommandFuncContainsHostTask) {
     // If we have a host task in an in-order queue with no last event mode, then
     // we must add a barrier to ensure ordering.
-    auto ResEvent = detail::event_impl::create_device_event(*this);
-    ur_event_handle_t UREvent = nullptr;
-    getAdapter().call<UrApiKind::urEnqueueEventsWaitWithBarrier>(
-        getHandleRef(), 0, nullptr, &UREvent);
-    ResEvent->setHandle(UREvent);
+    auto ResEvent = insertHelperBarrier();
     registerEventDependency</*LockQueue*/ false>(
         ResEvent, CGData.MEvents, this, getContextImpl(), getDeviceImpl(),
         hasCommandGraph() ? getCommandGraph().get() : nullptr,
@@ -1193,6 +1190,15 @@ void queue_impl::verifyProps(const property_list &Props) const {
   };
   detail::PropertyValidator::checkPropsAndThrow(Props, CheckDataLessProperties,
                                                 CheckPropertiesWithData);
+}
+
+EventImplPtr queue_impl::insertHelperBarrier() {
+  auto ResEvent = detail::event_impl::create_device_event(*this);
+  ur_event_handle_t UREvent = nullptr;
+  getAdapter().call<UrApiKind::urEnqueueEventsWaitWithBarrier>(
+      getHandleRef(), 0, nullptr, &UREvent);
+  ResEvent->setHandle(UREvent);
+  return ResEvent;
 }
 
 } // namespace detail

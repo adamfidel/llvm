@@ -721,15 +721,12 @@ public:
   }
 
 protected:
+  EventImplPtr insertHelperBarrier();
+
   template <typename HandlerType = handler>
   EventImplPtr insertHelperBarrier(const HandlerType &Handler) {
     queue_impl &Queue = Handler.impl->get_queue();
-    auto ResEvent = detail::event_impl::create_device_event(Queue);
-    ur_event_handle_t UREvent = nullptr;
-    getAdapter().call<UrApiKind::urEnqueueEventsWaitWithBarrier>(
-        Queue.getHandleRef(), 0, nullptr, &UREvent);
-    ResEvent->setHandle(UREvent);
-    return ResEvent;
+    return Queue.insertHelperBarrier();
   }
 
   template <typename HandlerType = handler>

@@ -632,6 +632,7 @@ EventImplPtr queue_impl::submit_graph_direct_impl(
     if (auto ParentGraph = getCommandGraph(); ParentGraph) {
       std::unique_ptr<detail::CG> CommandGroup;
       {
+        // Matt TODO: Is this lock needed?
         ext::oneapi::experimental::detail::graph_impl::WriteLock ParentLock(
             ParentGraph->MMutex);
         CGData.MRequirements = G->getRequirements();
@@ -691,7 +692,10 @@ queue_impl::submit_direct(bool CallerNeedsEvent,
     getAdapter().call<UrApiKind::urEnqueueEventsWaitWithBarrier>(
         getHandleRef(), 0, nullptr, &UREvent);
     ResEvent->setHandle(UREvent);
-    CGData.MEvents.push_back(ResEvent);
+    registerEventDependency</*LockQueue*/ false>(
+        ResEvent, CGData.MEvents, this, getContextImpl(), getDeviceImpl(),
+        hasCommandGraph() ? getCommandGraph().get() : nullptr,
+        detail::CGType::ExecCommandBuffer);
   }
 
   for (event e : DepEvents) {

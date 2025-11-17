@@ -1214,9 +1214,11 @@ exec_graph_impl::enqueue(sycl::detail::queue_impl &Queue,
   CGData.MEvents.insert(CGData.MEvents.end(), MSchedulerDependencies.begin(),
                         MSchedulerDependencies.end());
   // Check if CGData is safe for scheduler bypass
-  bool SkipScheduler = detail::Scheduler::areEventsSafeForSchedulerBypass(
-                           CGData.MEvents, Queue.getContextImpl()) &&
-                       CGData.MRequirements.empty();
+  bool IsCGDataSafeForSchedulerBypass =
+      detail::Scheduler::areEventsSafeForSchedulerBypass(
+          CGData.MEvents, Queue.getContextImpl()) &&
+      CGData.MRequirements.empty();
+  bool SkipScheduler = IsCGDataSafeForSchedulerBypass && !MContainsHostTask;
 
   // This variable represents the returned event. It will always be nullptr if
   // EventNeeded is false.
@@ -1247,7 +1249,8 @@ exec_graph_impl::enqueue(sycl::detail::queue_impl &Queue,
       }
     }
   } else {
-    SignalEvent = enqueuePartitions(Queue, CGData, SkipScheduler, EventNeeded);
+    SignalEvent = enqueuePartitions(
+        Queue, CGData, IsCGDataSafeForSchedulerBypass, EventNeeded);
   }
 
   if (EventNeeded) {

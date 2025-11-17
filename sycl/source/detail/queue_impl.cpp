@@ -692,8 +692,8 @@ queue_impl::submit_direct(bool CallerNeedsEvent,
         LastEvent, CGData.MEvents, this, getContextImpl(), getDeviceImpl(),
         hasCommandGraph() ? getCommandGraph().get() : nullptr,
         detail::CGType::Kernel);
-  } else if (isInOrder() && CommandFuncContainsHostTask) {
-    // If we have a host task in an in-order queue but no last event, then
+  } else if (isInOrder() && MNoLastEventMode && CommandFuncContainsHostTask) {
+    // If we have a host task in an in-order queue with no last event mode, then
     // we must add a barrier to ensure ordering.
     auto ResEvent = detail::event_impl::create_device_event(*this);
     ur_event_handle_t UREvent = nullptr;
@@ -731,8 +731,7 @@ queue_impl::submit_direct(bool CallerNeedsEvent,
 
   // Synchronize with the "no last event mode", used by the handler-based
   // kernel submit path
-  MNoLastEventMode.store(isInOrder() && SchedulerBypass &&
-                             !CommandFuncContainsHostTask,
+  MNoLastEventMode.store(isInOrder() && SchedulerBypass,
                          std::memory_order_relaxed);
 
   // Sync with the last event for in order queue. For scheduler-bypass flow,
@@ -740,8 +739,7 @@ queue_impl::submit_direct(bool CallerNeedsEvent,
   // but for the scheduler-based flow, it needs to be done here, as the
   // scheduler handles host task submissions.
   if (isInOrder()) {
-    LastEvent =
-        (SchedulerBypass && !CommandFuncContainsHostTask) ? nullptr : EventImpl;
+    LastEvent = SchedulerBypass ? nullptr : EventImpl;
   }
 
   // Barrier and un-enqueued commands synchronization for out or order queue

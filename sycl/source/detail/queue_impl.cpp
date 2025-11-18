@@ -633,34 +633,36 @@ EventImplPtr queue_impl::submit_kernel_direct_impl(
 }
 
 EventImplPtr queue_impl::submit_graph_direct_impl(
-    std::shared_ptr<ext::oneapi::experimental::detail::exec_graph_impl> G,
+    std::shared_ptr<ext::oneapi::experimental::detail::exec_graph_impl>
+        ExecGraph,
     bool CallerNeedsEvent, sycl::span<const event> DepEvents,
     const detail::code_location &CodeLoc, bool IsTopCodeLoc) {
-  bool EventNeeded = !isInOrder() || CallerNeedsEvent;
-  auto SubmitGraphFunc = [&](detail::CG::StorageInitHelper &CGData)
+  bool EventNeeded = CallerNeedsEvent || ExecGraph->containsHostTask() ||
+                     !supportsDiscardingPiEvents();
+  auto SubmitGraphFunc = [&](detail::CG::StorageInitHelper CGData)
       -> std::pair<EventImplPtr, bool> {
     if (auto ParentGraph = getCommandGraph(); ParentGraph) {
       std::unique_ptr<detail::CG> CommandGroup;
       {
         ext::oneapi::experimental::detail::graph_impl::ReadLock ParentLock(
             ParentGraph->MMutex);
-        CGData.MRequirements = G->getRequirements();
+        CGData.MRequirements = ExecGraph->getRequirements();
         // Here we are using the CommandGroup without passing a CommandBuffer to
         // pass the exec_graph_impl and event dependencies. Since this subgraph
         // CG will not be executed this is fine.
         CommandGroup.reset(
-            new sycl::detail::CGExecCommandBuffer(nullptr, G, CGData));
+            new sycl::detail::CGExecCommandBuffer(nullptr, ExecGraph, CGData));
       }
       CommandGroup->MIsTopCodeLoc = IsTopCodeLoc;
       return {submit_command_to_graph(*ParentGraph, std::move(CommandGroup),
                                       detail::CGType::ExecCommandBuffer),
               false};
     } else {
-      return G->enqueue(*this, CGData, EventNeeded);
+      return ExecGraph->enqueue(*this, CGData, EventNeeded);
     }
   };
-  return submit_direct(CallerNeedsEvent, DepEvents, G->containsHostTask(),
-                       SubmitGraphFunc);
+  return submit_direct(CallerNeedsEvent, DepEvents,
+                       ExecGraph->containsHostTask(), SubmitGraphFunc);
 }
 
 template <typename SubmitCommandFuncType>
@@ -700,7 +702,7 @@ queue_impl::submit_direct(bool CallerNeedsEvent,
     registerEventDependency</*LockQueue*/ false>(
         ResEvent, CGData.MEvents, this, getContextImpl(), getDeviceImpl(),
         hasCommandGraph() ? getCommandGraph().get() : nullptr,
-        detail::CGType::ExecCommandBuffer);
+        detail::CGType::Kernel);
   }
 
   for (event e : DepEvents) {

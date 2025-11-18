@@ -1213,7 +1213,6 @@ exec_graph_impl::enqueue(sycl::detail::queue_impl &Queue,
   cleanupExecutionEvents(MSchedulerDependencies);
   CGData.MEvents.insert(CGData.MEvents.end(), MSchedulerDependencies.begin(),
                         MSchedulerDependencies.end());
-  // Check if CGData is safe for scheduler bypass
   bool IsCGDataSafeForSchedulerBypass =
       detail::Scheduler::areEventsSafeForSchedulerBypass(
           CGData.MEvents, Queue.getContextImpl()) &&

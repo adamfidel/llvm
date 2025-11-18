@@ -745,7 +745,7 @@ queue_impl::submit_direct(bool CallerNeedsEvent,
   if (!isInOrder() && !EventImpl->isEnqueued()) {
     Deps.UnenqueuedCmdEvents.push_back(EventImpl);
   }
-  if (!isInOrder() && EventImpl) {
+  if (!isInOrder() && EventImpl && !hasCommandGraph()) {
     std::weak_ptr<event_impl> EventWeakPtr{EventImpl};
     MEventsWeak.push_back(std::move(EventWeakPtr));
   }

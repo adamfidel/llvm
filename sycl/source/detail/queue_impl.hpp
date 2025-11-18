@@ -386,18 +386,21 @@ public:
   }
 
   void submit_graph_direct_without_event(
-      std::shared_ptr<ext::oneapi::experimental::detail::exec_graph_impl> G,
+      std::shared_ptr<ext::oneapi::experimental::detail::exec_graph_impl>
+          ExecGraph,
       sycl::span<const event> DepEvents, const detail::code_location &CodeLoc,
       bool IsTopCodeLoc) {
-    submit_graph_direct_impl(G, false, DepEvents, CodeLoc, IsTopCodeLoc);
+    submit_graph_direct_impl(ExecGraph, false, DepEvents, CodeLoc,
+                             IsTopCodeLoc);
   }
 
   event submit_graph_direct_with_event(
-      std::shared_ptr<ext::oneapi::experimental::detail::exec_graph_impl> G,
+      std::shared_ptr<ext::oneapi::experimental::detail::exec_graph_impl>
+          ExecGraph,
       sycl::span<const event> DepEvents, const detail::code_location &CodeLoc,
       bool IsTopCodeLoc) {
-    return createSyclObjFromImpl<event>(
-        submit_graph_direct_impl(G, true, DepEvents, CodeLoc, IsTopCodeLoc));
+    return createSyclObjFromImpl<event>(submit_graph_direct_impl(
+        ExecGraph, true, DepEvents, CodeLoc, IsTopCodeLoc));
   }
 
   void submit_without_event(const detail::type_erased_cgfo_ty &CGF,
@@ -922,6 +925,7 @@ protected:
   /// \param DeviceKernelInfo is a structure aggregating kernel related data
   /// \param CallerNeedsEvent is a boolean indicating whether the event is
   ///        required by the user after the call.
+  /// \param DepEvents is a vector of dependencies of the operation.
   /// \param CodeLoc is the code location of the submit call
   /// \param IsTopCodeLoc Used to determine if the object is in a local
   ///        scope or in the top level scope.
@@ -934,8 +938,20 @@ protected:
       const detail::KernelPropertyHolderStructTy &Props,
       const detail::code_location &CodeLoc, bool IsTopCodeLoc);
 
+  /// Performs graph submission to the queue.
+  ///
+  /// \param ExecGraph is an executable graph
+  /// \param CallerNeedsEvent is a boolean indicating whether the event is
+  ///        required by the user after the call.
+  /// \param DepEvents is a vector of dependencies of the operation.
+  /// \param CodeLoc is the code location of the submit call
+  /// \param IsTopCodeLoc Used to determine if the object is in a local
+  ///        scope or in the top level scope.
+  ///
+  /// \return a SYCL event representing submitted command group or nullptr.
   EventImplPtr submit_graph_direct_impl(
-      std::shared_ptr<ext::oneapi::experimental::detail::exec_graph_impl> G,
+      std::shared_ptr<ext::oneapi::experimental::detail::exec_graph_impl>
+          ExecGraph,
       bool CallerNeedsEvent, sycl::span<const event> DepEvents,
       const detail::code_location &CodeLoc, bool IsTopCodeLoc);
 

@@ -326,6 +326,16 @@ void queue_impl::addEvent(const detail::EventImplPtr &EventImpl) {
   }
 }
 
+void queue_impl::addEventUnlocked(const detail::EventImplPtr &EventImpl) {
+  if (!EventImpl)
+    return;
+  Command *Cmd = EventImpl->getCommand();
+  if (Cmd != nullptr && EventImpl->getHandle() == nullptr) {
+    std::weak_ptr<event_impl> EventWeakPtr{EventImpl};
+    MEventsWeak.push_back(std::move(EventWeakPtr));
+  }
+}
+
 detail::EventImplPtr
 queue_impl::submit_impl(const detail::type_erased_cgfo_ty &CGF,
                         bool CallerNeedsEvent, const detail::code_location &Loc,
@@ -673,6 +683,7 @@ queue_impl::submit_direct(bool CallerNeedsEvent,
                           SubmitCommandFuncType &SubmitCommandFunc) {
   detail::CG::StorageInitHelper CGData;
   std::unique_lock<std::mutex> Lock(MMutex);
+  const bool inOrder = isInOrder();
 
   // Used by queue_empty() and getLastEvent()
   MEmpty.store(false, std::memory_order_release);
@@ -690,12 +701,12 @@ queue_impl::submit_direct(bool CallerNeedsEvent,
 
   // Sync with the last event for in order queue
   EventImplPtr &LastEvent = Deps.LastEventPtr;
-  if (isInOrder() && LastEvent) {
+  if (inOrder && LastEvent) {
     registerEventDependency</*LockQueue*/ false>(
         LastEvent, CGData.MEvents, this, getContextImpl(), getDeviceImpl(),
         hasCommandGraph() ? getCommandGraph().get() : nullptr,
         detail::CGType::Kernel);
-  } else if (isInOrder() && MNoLastEventMode && CommandFuncContainsHostTask) {
+  } else if (inOrder && MNoLastEventMode && CommandFuncContainsHostTask) {
     // If we have a host task in an in-order queue with no last event mode, then
     // we must add a barrier to ensure ordering.
     auto ResEvent = insertHelperBarrier();
@@ -713,7 +724,7 @@ queue_impl::submit_direct(bool CallerNeedsEvent,
   }
 
   // Barrier and un-enqueued commands synchronization for out or order queue
-  if (!isInOrder()) {
+  if (!inOrder) {
     MMissedCleanupRequests.unset(
         [&](MissedCleanupRequestsType &MissedCleanupRequests) {
           for (auto &UpdatedGraph : MissedCleanupRequests)
@@ -730,24 +741,23 @@ queue_impl::submit_direct(bool CallerNeedsEvent,
 
   // Synchronize with the "no last event mode", used by the handler-based
   // kernel submit path
-  MNoLastEventMode.store(isInOrder() && SchedulerBypass,
-                         std::memory_order_relaxed);
+  MNoLastEventMode.store(inOrder && SchedulerBypass, std::memory_order_relaxed);
 
   // Sync with the last event for in order queue. For scheduler-bypass flow,
   // the ordering is done at the layers below the SYCL runtime,
   // but for the scheduler-based flow, it needs to be done here, as the
   // scheduler handles host task submissions.
-  if (isInOrder()) {
+  if (inOrder) {
     LastEvent = SchedulerBypass ? nullptr : EventImpl;
   }
 
-  // Barrier and un-enqueued commands synchronization for out or order queue
-  if (!isInOrder() && !EventImpl->isEnqueued()) {
-    Deps.UnenqueuedCmdEvents.push_back(EventImpl);
-  }
-  if (!isInOrder() && EventImpl && !hasCommandGraph()) {
-    std::weak_ptr<event_impl> EventWeakPtr{EventImpl};
-    MEventsWeak.push_back(std::move(EventWeakPtr));
+  // Barrier and un-enqueued commands synchronization for out or order queue.
+  // The event must also be stored for future wait calls.
+  if (!inOrder) {
+    if (!EventImpl->isEnqueued()) {
+      Deps.UnenqueuedCmdEvents.push_back(EventImpl);
+    }
+    addEventUnlocked(EventImpl);
   }
 
   return CallerNeedsEvent ? EventImpl : nullptr;

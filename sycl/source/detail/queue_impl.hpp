@@ -1020,6 +1020,12 @@ protected:
   /// \param EventImpl is the event to be stored
   void addEvent(const detail::EventImplPtr &EventImpl);
 
+  /// Stores an event that should be associated with the queue with
+  /// the queue lock already acquired by caller.
+  ///
+  /// \param EventImpl is the event to be stored
+  void addEventUnlocked(const detail::EventImplPtr &EventImpl);
+
   /// Protects all the fields that can be changed by class' methods.
   mutable std::mutex MMutex;
 

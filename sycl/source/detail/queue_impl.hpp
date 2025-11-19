@@ -956,10 +956,10 @@ protected:
       const detail::code_location &CodeLoc, bool IsTopCodeLoc);
 
   template <typename SubmitCommandFuncType>
-  EventImplPtr submit_direct(bool CallerNeedsEvent,
-                             sycl::span<const event> DepEvents,
-                             bool CommandFuncContainsHostTask,
-                             SubmitCommandFuncType &SubmitCommandFunc);
+  EventImplPtr
+  submit_direct(bool CallerNeedsEvent, sycl::span<const event> DepEvents,
+                SubmitCommandFuncType &SubmitCommandFunc, detail::CGType Type,
+                bool CommandFuncContainsHostTask);
 
   /// Helper function for submitting a memory operation with a handler.
   /// \param DepEvents is a vector of dependencies of the operation.

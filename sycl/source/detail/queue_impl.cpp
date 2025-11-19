@@ -638,8 +638,9 @@ EventImplPtr queue_impl::submit_kernel_direct_impl(
             SchedulerBypass};
   };
 
-  return submit_direct(CallerNeedsEvent, DepEvents,
-                       /*CommandFuncContainsHostTask*/ false, SubmitKernelFunc);
+  return submit_direct(CallerNeedsEvent, DepEvents, SubmitKernelFunc,
+                       detail::CGType::Kernel,
+                       /*CommandFuncContainsHostTask*/ false);
 }
 
 EventImplPtr queue_impl::submit_graph_direct_impl(
@@ -666,21 +667,21 @@ EventImplPtr queue_impl::submit_graph_direct_impl(
       CommandGroup->MIsTopCodeLoc = IsTopCodeLoc;
       return {submit_command_to_graph(*ParentGraph, std::move(CommandGroup),
                                       detail::CGType::ExecCommandBuffer),
-              false};
+              /*BypassScheduler*/ false};
     } else {
       return ExecGraph->enqueue(*this, CGData, EventNeeded);
     }
   };
-  return submit_direct(CallerNeedsEvent, DepEvents,
-                       ExecGraph->containsHostTask(), SubmitGraphFunc);
+  return submit_direct(CallerNeedsEvent, DepEvents, SubmitGraphFunc,
+                       detail::CGType::ExecCommandBuffer,
+                       ExecGraph->containsHostTask());
 }
 
 template <typename SubmitCommandFuncType>
-detail::EventImplPtr
-queue_impl::submit_direct(bool CallerNeedsEvent,
-                          sycl::span<const event> DepEvents,
-                          bool CommandFuncContainsHostTask,
-                          SubmitCommandFuncType &SubmitCommandFunc) {
+detail::EventImplPtr queue_impl::submit_direct(
+    bool CallerNeedsEvent, sycl::span<const event> DepEvents,
+    SubmitCommandFuncType &SubmitCommandFunc, detail::CGType Type,
+    bool CommandFuncContainsHostTask) {
   detail::CG::StorageInitHelper CGData;
   std::unique_lock<std::mutex> Lock(MMutex);
   const bool inOrder = isInOrder();
@@ -694,7 +695,7 @@ queue_impl::submit_direct(bool CallerNeedsEvent,
     registerEventDependency</*LockQueue*/ false>(
         getSyclObjImpl(*ExternalEvent), CGData.MEvents, this, getContextImpl(),
         getDeviceImpl(), hasCommandGraph() ? getCommandGraph().get() : nullptr,
-        detail::CGType::Kernel);
+        Type);
   }
 
   auto &Deps = hasCommandGraph() ? MExtGraphDeps : MDefaultGraphDeps;
@@ -704,23 +705,21 @@ queue_impl::submit_direct(bool CallerNeedsEvent,
   if (inOrder && LastEvent) {
     registerEventDependency</*LockQueue*/ false>(
         LastEvent, CGData.MEvents, this, getContextImpl(), getDeviceImpl(),
-        hasCommandGraph() ? getCommandGraph().get() : nullptr,
-        detail::CGType::Kernel);
+        hasCommandGraph() ? getCommandGraph().get() : nullptr, Type);
   } else if (inOrder && MNoLastEventMode && CommandFuncContainsHostTask) {
     // If we have a host task in an in-order queue with no last event mode, then
     // we must add a barrier to ensure ordering.
     auto ResEvent = insertHelperBarrier();
     registerEventDependency</*LockQueue*/ false>(
         ResEvent, CGData.MEvents, this, getContextImpl(), getDeviceImpl(),
-        hasCommandGraph() ? getCommandGraph().get() : nullptr,
-        detail::CGType::Kernel);
+        hasCommandGraph() ? getCommandGraph().get() : nullptr, Type);
   }
 
   for (event e : DepEvents) {
     registerEventDependency</*LockQueue*/ false>(
         getSyclObjImpl(e), CGData.MEvents, this, getContextImpl(),
         getDeviceImpl(), hasCommandGraph() ? getCommandGraph().get() : nullptr,
-        detail::CGType::Kernel);
+        Type);
   }
 
   // Barrier and un-enqueued commands synchronization for out or order queue

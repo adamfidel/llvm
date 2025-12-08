@@ -917,7 +917,9 @@ exec_graph_impl::exec_graph_impl(sycl::context Context,
       MIsUpdatable(PropList.has_property<property::graph::updatable>()),
       MEnableProfiling(
           PropList.has_property<property::graph::enable_profiling>()),
-      MID(NextAvailableID.fetch_add(1, std::memory_order_relaxed)) {
+      MID(NextAvailableID.fetch_add(1, std::memory_order_relaxed)),
+      MIndependentSubmissions(
+          PropList.has_property<property::graph::independent_submissions>()) {
   checkGraphPropertiesAndThrow(PropList);
   // If the graph has been marked as updatable then check if the backend
   // actually supports that. Devices supporting aspect::ext_oneapi_graph must
@@ -1071,19 +1073,36 @@ EventImplPtr exec_graph_impl::enqueuePartitionDirectly(
       UrEnqueueWaitListSize == 0 ? nullptr : UrEventHandles.data();
 
   if (!EventNeeded) {
-    Queue.getAdapter().call<sycl::detail::UrApiKind::urEnqueueCommandBufferExp>(
-        Queue.getHandleRef(), CommandBuffer, UrEnqueueWaitListSize,
-        UrEnqueueWaitList, nullptr);
-    return nullptr;
+    if (MIndependentSubmissions) {
+      Queue.getAdapter()
+          .call<sycl::detail::UrApiKind::urEnqueueIndependentCommandBufferExp>(
+              Queue.getHandleRef(), CommandBuffer, UrEnqueueWaitListSize,
+              UrEnqueueWaitList, nullptr);
+      return nullptr;
+    } else {
+      Queue.getAdapter()
+          .call<sycl::detail::UrApiKind::urEnqueueCommandBufferExp>(
+              Queue.getHandleRef(), CommandBuffer, UrEnqueueWaitListSize,
+              UrEnqueueWaitList, nullptr);
+      return nullptr;
+    }
   } else {
     auto NewEvent = sycl::detail::event_impl::create_device_event(Queue);
     NewEvent->setContextImpl(Queue.getContextImpl());
     NewEvent->setStateIncomplete();
     NewEvent->setSubmissionTime();
     ur_event_handle_t UrEvent = nullptr;
-    Queue.getAdapter().call<sycl::detail::UrApiKind::urEnqueueCommandBufferExp>(
-        Queue.getHandleRef(), CommandBuffer, UrEventHandles.size(),
-        UrEnqueueWaitList, &UrEvent);
+    if (MIndependentSubmissions) {
+      Queue.getAdapter()
+          .call<sycl::detail::UrApiKind::urEnqueueIndependentCommandBufferExp>(
+              Queue.getHandleRef(), CommandBuffer, UrEnqueueWaitListSize,
+              UrEnqueueWaitList, &UrEvent);
+    } else {
+      Queue.getAdapter()
+          .call<sycl::detail::UrApiKind::urEnqueueCommandBufferExp>(
+              Queue.getHandleRef(), CommandBuffer, UrEnqueueWaitListSize,
+              UrEnqueueWaitList, &UrEvent);
+    }
     NewEvent->setHandle(UrEvent);
     NewEvent->setEventFromSubmittedExecCommandBuffer(true);
     return NewEvent;

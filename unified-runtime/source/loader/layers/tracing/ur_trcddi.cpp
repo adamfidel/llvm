@@ -9291,6 +9291,61 @@ __urdlllocal ur_result_t UR_APICALL urEnqueueCommandBufferExp(
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+/// @brief Intercept function for urEnqueueIndependentCommandBufferExp
+__urdlllocal ur_result_t UR_APICALL urEnqueueIndependentCommandBufferExp(
+    /// [in] The queue to submit this command-buffer for execution.
+    ur_queue_handle_t hQueue,
+    /// [in] Handle of the command-buffer object.
+    ur_exp_command_buffer_handle_t hCommandBuffer,
+    /// [in] Size of the event wait list.
+    uint32_t numEventsInWaitList,
+    /// [in][optional][range(0, numEventsInWaitList)] pointer to a list of
+    /// events that must be complete before the command-buffer execution.
+    /// If nullptr, the numEventsInWaitList must be 0, indicating no wait
+    /// events.
+    const ur_event_handle_t *phEventWaitList,
+    /// [out][optional][alloc] return an event object that identifies this
+    /// particular command-buffer execution instance. If nullptr and queue is
+    /// in-order, event signaling overhead may be avoided. If phEventWaitList
+    /// and phEvent are not NULL, phEvent must not refer to an element of the
+    /// phEventWaitList array.
+    ur_event_handle_t *phEvent) {
+  auto pfnIndependentCommandBufferExp =
+      getContext()->urDdiTable.EnqueueExp.pfnIndependentCommandBufferExp;
+
+  if (nullptr == pfnIndependentCommandBufferExp)
+    return UR_RESULT_ERROR_UNSUPPORTED_FEATURE;
+
+  ur_enqueue_independent_command_buffer_exp_params_t params = {
+      &hQueue, &hCommandBuffer, &numEventsInWaitList, &phEventWaitList,
+      &phEvent};
+  uint64_t instance = getContext()->notify_begin(
+      UR_FUNCTION_ENQUEUE_INDEPENDENT_COMMAND_BUFFER_EXP,
+      "urEnqueueIndependentCommandBufferExp", &params);
+
+  auto &logger = getContext()->logger;
+  UR_LOG_L(logger, INFO, "   ---> urEnqueueIndependentCommandBufferExp\n");
+
+  ur_result_t result = pfnIndependentCommandBufferExp(
+      hQueue, hCommandBuffer, numEventsInWaitList, phEventWaitList, phEvent);
+
+  getContext()->notify_end(UR_FUNCTION_ENQUEUE_INDEPENDENT_COMMAND_BUFFER_EXP,
+                           "urEnqueueIndependentCommandBufferExp", &params,
+                           &result, instance);
+
+  if (logger.getLevel() <= UR_LOGGER_LEVEL_INFO) {
+    std::ostringstream args_str;
+    ur::extras::printFunctionParams(
+        args_str, UR_FUNCTION_ENQUEUE_INDEPENDENT_COMMAND_BUFFER_EXP, &params);
+    UR_LOG_L(logger, INFO,
+             "   <--- urEnqueueIndependentCommandBufferExp({}) -> {};\n",
+             args_str.str(), result);
+  }
+
+  return result;
+}
+
+///////////////////////////////////////////////////////////////////////////////
 /// @brief Intercept function for urCommandBufferUpdateKernelLaunchExp
 __urdlllocal ur_result_t UR_APICALL urCommandBufferUpdateKernelLaunchExp(
     /// [in] Handle of the command-buffer object.
@@ -11456,6 +11511,11 @@ __urdlllocal ur_result_t UR_APICALL urGetEnqueueExpProcAddrTable(
 
   dditable.pfnCommandBufferExp = pDdiTable->pfnCommandBufferExp;
   pDdiTable->pfnCommandBufferExp = ur_tracing_layer::urEnqueueCommandBufferExp;
+
+  dditable.pfnIndependentCommandBufferExp =
+      pDdiTable->pfnIndependentCommandBufferExp;
+  pDdiTable->pfnIndependentCommandBufferExp =
+      ur_tracing_layer::urEnqueueIndependentCommandBufferExp;
 
   dditable.pfnTimestampRecordingExp = pDdiTable->pfnTimestampRecordingExp;
   pDdiTable->pfnTimestampRecordingExp =

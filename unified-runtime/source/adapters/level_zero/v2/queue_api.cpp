@@ -433,6 +433,15 @@ ur_result_t urEnqueueCommandBufferExp(
 } catch (...) {
   return exceptionToResult(std::current_exception());
 }
+ur_result_t urEnqueueIndependentCommandBufferExp(
+    ur_queue_handle_t hQueue, ur_exp_command_buffer_handle_t hCommandBuffer,
+    uint32_t numEventsInWaitList, const ur_event_handle_t *phEventWaitList,
+    ur_event_handle_t *phEvent) try {
+  return hQueue->get().enqueueIndependentCommandBufferExp(
+      hCommandBuffer, numEventsInWaitList, phEventWaitList, phEvent);
+} catch (...) {
+  return exceptionToResult(std::current_exception());
+}
 ur_result_t urEnqueueTimestampRecordingExp(
     ur_queue_handle_t hQueue, bool blocking, uint32_t numEventsInWaitList,
     const ur_event_handle_t *phEventWaitList, ur_event_handle_t *phEvent) try {

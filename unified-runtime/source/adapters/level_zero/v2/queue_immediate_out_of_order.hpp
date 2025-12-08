@@ -569,6 +569,22 @@ public:
         createEventAndRetain(eventPool.get(), phEvent, this));
   }
 
+  ur_result_t enqueueIndependentCommandBufferExp(
+      ur_exp_command_buffer_handle_t hCommandBuffer,
+      uint32_t numEventsInWaitList, const ur_event_handle_t *phEventWaitList,
+      ur_event_handle_t *phEvent) override {
+    wait_list_view waitListView =
+        wait_list_view(phEventWaitList, numEventsInWaitList);
+
+    auto commandListId = getNextCommandListId();
+    ur_event_handle_t hSignalEvent =
+        (phEvent != nullptr)
+            ? createEventAndRetain(eventPool.get(), phEvent, this)
+            : nullptr;
+    return commandListManagers.lock()[commandListId].appendCommandBufferExp(
+        hCommandBuffer, waitListView, hSignalEvent);
+  }
+
   ur_result_t enqueueNativeCommandExp(
       ur_exp_enqueue_native_command_function_t pfnNativeEnqueue, void *data,
       uint32_t numMemsInMemList, const ur_mem_handle_t *phMemList,

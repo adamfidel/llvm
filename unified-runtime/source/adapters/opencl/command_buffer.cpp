@@ -846,3 +846,9 @@ urCommandBufferGetNativeHandleExp(ur_exp_command_buffer_handle_t hCommandBuffer,
       reinterpret_cast<ur_native_handle_t>(hCommandBuffer->CLCommandBuffer);
   return UR_RESULT_SUCCESS;
 }
+
+UR_APIEXPORT ur_result_t UR_APICALL urEnqueueIndependentCommandBufferExp(
+    ur_queue_handle_t, ur_exp_command_buffer_handle_t, uint32_t,
+    const ur_event_handle_t *, ur_event_handle_t *) {
+  return UR_RESULT_ERROR_UNSUPPORTED_FEATURE;
+}

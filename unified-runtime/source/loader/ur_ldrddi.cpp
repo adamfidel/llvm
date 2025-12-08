@@ -5301,6 +5301,39 @@ __urdlllocal ur_result_t UR_APICALL urEnqueueCommandBufferExp(
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+/// @brief Intercept function for urEnqueueIndependentCommandBufferExp
+__urdlllocal ur_result_t UR_APICALL urEnqueueIndependentCommandBufferExp(
+    /// [in] The queue to submit this command-buffer for execution.
+    ur_queue_handle_t hQueue,
+    /// [in] Handle of the command-buffer object.
+    ur_exp_command_buffer_handle_t hCommandBuffer,
+    /// [in] Size of the event wait list.
+    uint32_t numEventsInWaitList,
+    /// [in][optional][range(0, numEventsInWaitList)] pointer to a list of
+    /// events that must be complete before the command-buffer execution.
+    /// If nullptr, the numEventsInWaitList must be 0, indicating no wait
+    /// events.
+    const ur_event_handle_t *phEventWaitList,
+    /// [out][optional][alloc] return an event object that identifies this
+    /// particular command-buffer execution instance. If nullptr and queue is
+    /// in-order, event signaling overhead may be avoided. If phEventWaitList
+    /// and phEvent are not NULL, phEvent must not refer to an element of the
+    /// phEventWaitList array.
+    ur_event_handle_t *phEvent) {
+
+  auto *dditable = *reinterpret_cast<ur_dditable_t **>(hQueue);
+
+  auto *pfnIndependentCommandBufferExp =
+      dditable->EnqueueExp.pfnIndependentCommandBufferExp;
+  if (nullptr == pfnIndependentCommandBufferExp)
+    return UR_RESULT_ERROR_UNINITIALIZED;
+
+  // forward to device-platform
+  return pfnIndependentCommandBufferExp(
+      hQueue, hCommandBuffer, numEventsInWaitList, phEventWaitList, phEvent);
+}
+
+///////////////////////////////////////////////////////////////////////////////
 /// @brief Intercept function for urCommandBufferUpdateKernelLaunchExp
 __urdlllocal ur_result_t UR_APICALL urCommandBufferUpdateKernelLaunchExp(
     /// [in] Handle of the command-buffer object.
@@ -6643,6 +6676,8 @@ UR_DLLEXPORT ur_result_t UR_APICALL urGetEnqueueExpProcAddrTable(
       pDdiTable->pfnUSMHostAllocExp = ur_loader::urEnqueueUSMHostAllocExp;
       pDdiTable->pfnUSMFreeExp = ur_loader::urEnqueueUSMFreeExp;
       pDdiTable->pfnCommandBufferExp = ur_loader::urEnqueueCommandBufferExp;
+      pDdiTable->pfnIndependentCommandBufferExp =
+          ur_loader::urEnqueueIndependentCommandBufferExp;
       pDdiTable->pfnTimestampRecordingExp =
           ur_loader::urEnqueueTimestampRecordingExp;
       pDdiTable->pfnNativeCommandExp = ur_loader::urEnqueueNativeCommandExp;

@@ -160,6 +160,10 @@ struct ur_queue_t_ : ur_queue_extensions {
                                               uint32_t,
                                               const ur_event_handle_t *,
                                               ur_event_handle_t *) = 0;
+  virtual ur_result_t
+  enqueueIndependentCommandBufferExp(ur_exp_command_buffer_handle_t, uint32_t,
+                                     const ur_event_handle_t *,
+                                     ur_event_handle_t *) = 0;
   virtual ur_result_t enqueueTimestampRecordingExp(bool, uint32_t,
                                                    const ur_event_handle_t *,
                                                    ur_event_handle_t *) = 0;

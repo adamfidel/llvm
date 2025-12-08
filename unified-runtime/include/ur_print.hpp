@@ -1358,6 +1358,9 @@ inline std::ostream &operator<<(std::ostream &os, enum ur_function_t value) {
   case UR_FUNCTION_ENQUEUE_GRAPH_EXP:
     os << "UR_FUNCTION_ENQUEUE_GRAPH_EXP";
     break;
+  case UR_FUNCTION_ENQUEUE_INDEPENDENT_COMMAND_BUFFER_EXP:
+    os << "UR_FUNCTION_ENQUEUE_INDEPENDENT_COMMAND_BUFFER_EXP";
+    break;
   default:
     os << "unknown enumerator";
     break;
@@ -17973,6 +17976,53 @@ operator<<(std::ostream &os,
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+/// @brief Print operator for the
+/// ur_enqueue_independent_command_buffer_exp_params_t type
+/// @returns
+///     std::ostream &
+inline std::ostream &
+operator<<(std::ostream &os, [[maybe_unused]] const struct
+           ur_enqueue_independent_command_buffer_exp_params_t *params) {
+
+  os << ".hQueue = ";
+
+  ur::details::printPtr(os, *(params->phQueue));
+
+  os << ", ";
+  os << ".hCommandBuffer = ";
+
+  ur::details::printPtr(os, *(params->phCommandBuffer));
+
+  os << ", ";
+  os << ".numEventsInWaitList = ";
+
+  os << *(params->pnumEventsInWaitList);
+
+  os << ", ";
+  os << ".phEventWaitList = ";
+  ur::details::printPtr(
+      os, reinterpret_cast<const void *>(*(params->pphEventWaitList)));
+  if (*(params->pphEventWaitList) != NULL) {
+    os << " {";
+    for (size_t i = 0; i < *params->pnumEventsInWaitList; ++i) {
+      if (i != 0) {
+        os << ", ";
+      }
+
+      ur::details::printPtr(os, (*(params->pphEventWaitList))[i]);
+    }
+    os << "}";
+  }
+
+  os << ", ";
+  os << ".phEvent = ";
+
+  ur::details::printPtr(os, *(params->pphEvent));
+
+  return os;
+}
+
+///////////////////////////////////////////////////////////////////////////////
 /// @brief Print operator for the ur_enqueue_timestamp_recording_exp_params_t
 /// type
 /// @returns
@@ -22504,6 +22554,10 @@ inline ur_result_t UR_APICALL printFunctionParams(std::ostream &os,
   } break;
   case UR_FUNCTION_ENQUEUE_COMMAND_BUFFER_EXP: {
     os << (const struct ur_enqueue_command_buffer_exp_params_t *)params;
+  } break;
+  case UR_FUNCTION_ENQUEUE_INDEPENDENT_COMMAND_BUFFER_EXP: {
+    os << (const struct ur_enqueue_independent_command_buffer_exp_params_t *)
+            params;
   } break;
   case UR_FUNCTION_ENQUEUE_TIMESTAMP_RECORDING_EXP: {
     os << (const struct ur_enqueue_timestamp_recording_exp_params_t *)params;

@@ -953,6 +953,8 @@ private:
   // True if this graph contains any host-tasks, indicates we need special
   // handling for them during update().
   bool MContainsHostTask = false;
+
+  bool MIndependentSubmissions = false;
 };
 } // namespace detail
 } // namespace experimental

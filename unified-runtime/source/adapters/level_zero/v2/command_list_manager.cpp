@@ -621,7 +621,8 @@ ur_result_t ur_command_list_manager::appendGenericCommandListsExp(
     ur_command_t callerCommand) {
   TRACK_SCOPE_LATENCY("ur_command_list_manager::appendGenericCommandListsExp");
 
-  auto zeSignalEvent = getSignalEvent(phEvent, callerCommand);
+  ze_event_handle_t zeSignalEvent =
+      (phEvent != nullptr) ? getSignalEvent(phEvent, callerCommand) : nullptr;
 
   auto [pWaitEvents, numWaitEvents, _] = waitListView;
 
@@ -640,7 +641,7 @@ ur_result_t ur_command_list_manager::appendCommandBufferExp(
   ze_command_list_handle_t commandBufferCommandList =
       bufferCommandListLocked->zeCommandList.get();
 
-  assert(phEvent);
+  // assert(phEvent);
 
   ur_event_handle_t executionEvent =
       hCommandBuffer->getExecutionEventUnlocked();
@@ -653,7 +654,9 @@ ur_result_t ur_command_list_manager::appendCommandBufferExp(
   UR_CALL(appendGenericCommandListsExp(1, &commandBufferCommandList, phEvent,
                                        waitListView,
                                        UR_COMMAND_ENQUEUE_COMMAND_BUFFER_EXP));
-  UR_CALL(hCommandBuffer->registerExecutionEventUnlocked(phEvent));
+  if (phEvent != nullptr) {
+    UR_CALL(hCommandBuffer->registerExecutionEventUnlocked(phEvent));
+  }
 
   return UR_RESULT_SUCCESS;
 }

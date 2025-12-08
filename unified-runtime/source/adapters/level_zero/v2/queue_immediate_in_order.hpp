@@ -511,10 +511,24 @@ public:
                           ur_event_handle_t *phEvent) override {
     wait_list_view waitListView =
         wait_list_view(phEventWaitList, numEventsInWaitList);
-
+    ur_event_handle_t hSignalEvent =
+        createEventAndRetain(eventPool.get(), phEvent, this);
     return commandListManager.lock()->appendCommandBufferExp(
-        hCommandBuffer, waitListView,
-        createEventAndRetain(eventPool.get(), phEvent, this));
+        hCommandBuffer, waitListView, hSignalEvent);
+  }
+
+  ur_result_t enqueueIndependentCommandBufferExp(
+      ur_exp_command_buffer_handle_t hCommandBuffer,
+      uint32_t numEventsInWaitList, const ur_event_handle_t *phEventWaitList,
+      ur_event_handle_t *phEvent) override {
+    wait_list_view waitListView =
+        wait_list_view(phEventWaitList, numEventsInWaitList);
+    ur_event_handle_t hSignalEvent =
+        (phEvent != nullptr)
+            ? createEventAndRetain(eventPool.get(), phEvent, this)
+            : nullptr;
+    return commandListManager.lock()->appendCommandBufferExp(
+        hCommandBuffer, waitListView, hSignalEvent);
   }
 
   ur_result_t enqueueNativeCommandExp(

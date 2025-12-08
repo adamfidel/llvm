@@ -435,6 +435,11 @@ public:
                           const ur_event_handle_t *phEventWaitList,
                           ur_event_handle_t *phEvent) override;
 
+  ur_result_t enqueueIndependentCommandBufferExp(
+      ur_exp_command_buffer_handle_t hCommandBuffer,
+      uint32_t numEventsInWaitList, const ur_event_handle_t *phEventWaitList,
+      ur_event_handle_t *phEvent) override;
+
   ur_result_t enqueueNativeCommandExp(
       ur_exp_enqueue_native_command_function_t pfnNativeEnqueue, void *data,
       uint32_t numMemsInMemList, const ur_mem_handle_t *phMemList,

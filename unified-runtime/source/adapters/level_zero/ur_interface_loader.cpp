@@ -232,6 +232,8 @@ UR_APIEXPORT ur_result_t UR_APICALL urGetEnqueueExpProcAddrTable(
   pDdiTable->pfnUSMHostAllocExp = ur::level_zero::urEnqueueUSMHostAllocExp;
   pDdiTable->pfnUSMFreeExp = ur::level_zero::urEnqueueUSMFreeExp;
   pDdiTable->pfnCommandBufferExp = ur::level_zero::urEnqueueCommandBufferExp;
+  pDdiTable->pfnIndependentCommandBufferExp =
+      ur::level_zero::urEnqueueIndependentCommandBufferExp;
   pDdiTable->pfnTimestampRecordingExp =
       ur::level_zero::urEnqueueTimestampRecordingExp;
   pDdiTable->pfnNativeCommandExp = ur::level_zero::urEnqueueNativeCommandExp;

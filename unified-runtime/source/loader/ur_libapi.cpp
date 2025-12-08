@@ -9693,6 +9693,64 @@ ur_result_t UR_APICALL urEnqueueCommandBufferExp(
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+/// @brief Submit a command-buffer for execution on a queue without signaling an
+///        event.
+///
+/// @details
+/// This is an optimization for in-order queues where event signaling overhead
+/// can be avoided when the caller does not need the event. The command-buffer
+/// execution still respects dependencies from phEventWaitList.
+///
+/// @returns
+///     - ::UR_RESULT_SUCCESS
+///     - ::UR_RESULT_ERROR_UNINITIALIZED
+///     - ::UR_RESULT_ERROR_DEVICE_LOST
+///     - ::UR_RESULT_ERROR_ADAPTER_SPECIFIC
+///     - ::UR_RESULT_ERROR_INVALID_NULL_HANDLE
+///         + `NULL == hQueue`
+///         + `NULL == hCommandBuffer`
+///     - ::UR_RESULT_ERROR_INVALID_COMMAND_BUFFER_EXP
+///     - ::UR_RESULT_ERROR_INVALID_QUEUE
+///     - ::UR_RESULT_ERROR_INVALID_EVENT
+///     - ::UR_RESULT_ERROR_INVALID_EVENT_WAIT_LIST
+///         + `phEventWaitList == NULL && numEventsInWaitList > 0`
+///         + `phEventWaitList != NULL && numEventsInWaitList == 0`
+///         + If event objects in phEventWaitList are not valid events.
+///     - ::UR_RESULT_ERROR_UNSUPPORTED_FEATURE
+///         + If the adapter does not support this experimental feature.
+///     - ::UR_RESULT_ERROR_OUT_OF_HOST_MEMORY
+///     - ::UR_RESULT_ERROR_OUT_OF_RESOURCES
+ur_result_t UR_APICALL urEnqueueIndependentCommandBufferExp(
+    /// [in] The queue to submit this command-buffer for execution.
+    ur_queue_handle_t hQueue,
+    /// [in] Handle of the command-buffer object.
+    ur_exp_command_buffer_handle_t hCommandBuffer,
+    /// [in] Size of the event wait list.
+    uint32_t numEventsInWaitList,
+    /// [in][optional][range(0, numEventsInWaitList)] pointer to a list of
+    /// events that must be complete before the command-buffer execution.
+    /// If nullptr, the numEventsInWaitList must be 0, indicating no wait
+    /// events.
+    const ur_event_handle_t *phEventWaitList,
+    /// [out][optional][alloc] return an event object that identifies this
+    /// particular command-buffer execution instance. If nullptr and queue is
+    /// in-order, event signaling overhead may be avoided. If phEventWaitList
+    /// and phEvent are not NULL, phEvent must not refer to an element of the
+    /// phEventWaitList array.
+    ur_event_handle_t *phEvent) try {
+  auto pfnIndependentCommandBufferExp =
+      ur_lib::getContext()
+          ->urDdiTable.EnqueueExp.pfnIndependentCommandBufferExp;
+  if (nullptr == pfnIndependentCommandBufferExp)
+    return UR_RESULT_ERROR_UNINITIALIZED;
+
+  return pfnIndependentCommandBufferExp(
+      hQueue, hCommandBuffer, numEventsInWaitList, phEventWaitList, phEvent);
+} catch (...) {
+  return exceptionToResult(std::current_exception());
+}
+
+///////////////////////////////////////////////////////////////////////////////
 /// @brief Update a kernel launch command in a finalized command-buffer.
 ///
 /// @details

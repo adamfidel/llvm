@@ -749,6 +749,10 @@ ur_result_t urEnqueueCommandBufferExp(
     ur_queue_handle_t hQueue, ur_exp_command_buffer_handle_t hCommandBuffer,
     uint32_t numEventsInWaitList, const ur_event_handle_t *phEventWaitList,
     ur_event_handle_t *phEvent);
+ur_result_t urEnqueueIndependentCommandBufferExp(
+    ur_queue_handle_t hQueue, ur_exp_command_buffer_handle_t hCommandBuffer,
+    uint32_t numEventsInWaitList, const ur_event_handle_t *phEventWaitList,
+    ur_event_handle_t *phEvent);
 ur_result_t urCommandBufferUpdateKernelLaunchExp(
     ur_exp_command_buffer_handle_t hCommandBuffer, uint32_t numKernelUpdates,
     const ur_exp_command_buffer_update_kernel_launch_desc_t

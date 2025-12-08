@@ -957,12 +957,36 @@ ur_result_t ur_queue_batched_t::enqueueCommandBufferExp(
   if (!lockedBatch->isActiveBatchEmpty()) {
     UR_CALL(queueFlushUnlocked(lockedBatch));
   }
-
+  ur_event_handle_t hSignalEvent =
+      createEventAndRetain(eventPoolImmediate.get(), phEvent, this);
   // Regular lists cannot be appended to other regular lists for execution, only
   // to immediate lists
   return lockedBatch->getImmediateManager().appendCommandBufferExp(
-      hCommandBuffer, waitListView,
-      createEventAndRetain(eventPoolImmediate.get(), phEvent, this));
+      hCommandBuffer, waitListView, hSignalEvent);
+}
+
+ur_result_t ur_queue_batched_t::enqueueIndependentCommandBufferExp(
+    ur_exp_command_buffer_handle_t hCommandBuffer, uint32_t numEventsInWaitList,
+    const ur_event_handle_t *phEventWaitList, ur_event_handle_t *phEvent) {
+  wait_list_view waitListView =
+      wait_list_view(phEventWaitList, numEventsInWaitList, this);
+
+  auto lockedBatch = currentCmdLists.lock();
+
+  // Firstly, enqueue the current batch (a regular list), then enqueue the
+  // command buffer batch (also a regular list) to preserve the order of
+  // operations
+  if (!lockedBatch->isActiveBatchEmpty()) {
+    UR_CALL(queueFlushUnlocked(lockedBatch));
+  }
+  ur_event_handle_t hSignalEvent =
+      (phEvent != nullptr)
+          ? createEventAndRetain(eventPoolImmediate.get(), phEvent, this)
+          : nullptr;
+  // Regular lists cannot be appended to other regular lists for execution, only
+  // to immediate lists
+  return lockedBatch->getImmediateManager().appendCommandBufferExp(
+      hCommandBuffer, waitListView, hSignalEvent);
 }
 
 ur_result_t ur_queue_batched_t::enqueueNativeCommandExp(

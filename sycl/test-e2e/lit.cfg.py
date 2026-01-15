@@ -1167,10 +1167,7 @@ if has_level_zero:
                     # Check if version >= 1.25.2
                     if (major, minor, patch) >= (1, 25, 2):
                         lit_config.note("Level Zero loader version supports cb event leak check")
-                        # Add feature to all level_zero devices
-                        for full_name in config.sycl_dev_features:
-                            if "level_zero" in full_name:
-                                config.sycl_dev_features[full_name].add("leak-check-cb-event-supported")
+                        config.available_features.add("l0_loader_trace_cb_event")
                     break
     except Exception as e:
         lit_config.warning(f"Failed to detect Level Zero loader version: {e}")

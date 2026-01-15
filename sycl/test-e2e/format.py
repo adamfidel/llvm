@@ -355,6 +355,7 @@ class SYCLEndToEndTest(lit.formats.ShTest):
                     "windows",
                     "preview-breaking-changes-supported",
                     "gpu",
+                    "l0_loader_trace_cb_event",
                 ]:
                     if cond_features in test.config.available_features:
                         conditions[cond_features] = True

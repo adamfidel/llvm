@@ -988,6 +988,8 @@ config.sycl_dev_features = {}
 
 # Version of the driver for a given device. Empty for non-Intel devices.
 config.intel_driver_ver = {}
+# First detected Level Zero loader version (assumed to be shared across all L0 platforms)
+config.level_zero_loader_ver = None
 for full_name, sycl_device in zip(
     config.sycl_devices, remove_level_zero_suffix(config.sycl_devices)
 ):
@@ -1143,6 +1145,35 @@ for full_name, sycl_device in zip(
         config.intel_driver_ver[full_name] = intel_driver_ver
     else:
         config.intel_driver_ver[full_name] = {}
+
+
+# Check Level Zero loader version for leak check support
+# Need to check if any device uses level_zero backend
+has_level_zero = any(dev.startswith("level_zero") for dev in remove_level_zero_suffix(config.sycl_devices))
+if has_level_zero:
+    try:
+        with test_env():
+            env = copy.copy(llvm_config.config.environment)
+            env["UR_L0_DEBUG"] = "1"
+            cmd = "{} {}".format(config.run_launcher or "", sycl_ls)
+            sp = subprocess.run(cmd, env=env, text=True, shell=True, capture_output=True)
+            for line in sp.stderr.splitlines():
+                # Match "Level Zero Loader Version: X.Y.Z"
+                match = re.match(r"Level Zero Loader Version: ([0-9]+)\.([0-9]+)\.([0-9]+)", line)
+                if match:
+                    major, minor, patch = int(match.group(1)), int(match.group(2)), int(match.group(3))
+                    config.level_zero_loader_ver = (major, minor, patch)
+                    lit_config.note(f"Detected Level Zero Loader Version: {major}.{minor}.{patch}")
+                    # Check if version >= 1.25.2
+                    if (major, minor, patch) >= (1, 25, 2):
+                        lit_config.note("Level Zero loader version supports cb event leak check")
+                        # Add feature to all level_zero devices
+                        for full_name in config.sycl_dev_features:
+                            if "level_zero" in full_name:
+                                config.sycl_dev_features[full_name].add("leak-check-cb-event-supported")
+                    break
+    except Exception as e:
+        lit_config.warning(f"Failed to detect Level Zero loader version: {e}")
 
 if lit_config.params.get("compatibility_testing", "False") != "False":
     config.substitutions.append(("%clangxx", " true "))

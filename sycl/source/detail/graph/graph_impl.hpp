@@ -1002,6 +1002,10 @@ private:
   // True if this graph contains any host-tasks, indicates we need special
   // handling for them during update().
   bool MContainsHostTask = false;
+
+  /// Controls whether native recording is enabled for improved performance.
+  /// Set by the SYCL_GRAPH_ENABLE_NATIVE_RECORDING environment variable.
+  bool MEnableNativeRecording = false;
 };
 } // namespace detail
 } // namespace experimental

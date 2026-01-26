@@ -1033,7 +1033,8 @@ exec_graph_impl::exec_graph_impl(sycl::context Context,
       MIsUpdatable(PropList.has_property<property::graph::updatable>()),
       MEnableProfiling(
           PropList.has_property<property::graph::enable_profiling>()),
-      MID(NextAvailableID.fetch_add(1, std::memory_order_relaxed)) {
+      MID(NextAvailableID.fetch_add(1, std::memory_order_relaxed)),
+      MEnableNativeRecording(GraphImpl->isNativeRecordingEnabled()) {
   checkGraphPropertiesAndThrow(PropList);
   // If the graph has been marked as updatable then check if the backend
   // actually supports that. Devices supporting aspect::ext_oneapi_graph must
@@ -1044,11 +1045,16 @@ exec_graph_impl::exec_graph_impl(sycl::context Context,
       throw sycl::exception(sycl::make_error_code(errc::feature_not_supported),
                             "Device does not support Command Graph update");
     }
+    if (MEnableNativeRecording) {
+      throw sycl::exception(
+          sycl::make_error_code(errc::feature_not_supported),
+          "Command Graph update is not supported with native recording");
+    }
   }
 
   // Create native UR executable graph if the modifiable graph uses native
   // recording
-  if (GraphImpl->isNativeRecordingEnabled()) {
+  if (MEnableNativeRecording) {
     context_impl &ContextImpl = *sycl::detail::getSyclObjImpl(MContext);
     sycl::detail::adapter_impl &Adapter = ContextImpl.getAdapter();
     ur_result_t Result =

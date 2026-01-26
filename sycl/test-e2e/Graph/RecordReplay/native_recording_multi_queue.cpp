@@ -68,7 +68,7 @@ int main() {
   });
 
   // Record final reduction kernel with dependency on Queue2 event
-  Queue1.parallel_for(range<1>{1}, {Join}, [=](id<1> idx) {
+  Queue1.single_task({Join}, [=]() {
     FinalResult[0] = PartialResult1[0] + PartialResult2[0];
   });
 

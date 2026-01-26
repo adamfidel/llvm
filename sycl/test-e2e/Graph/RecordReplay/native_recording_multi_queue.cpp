@@ -33,7 +33,6 @@ int main() {
   exp_ext::command_graph Graph{Ctx, Dev};
 
   const size_t N = 1024;
-  const size_t HalfN = N / 2;
 
   // Allocate input vectors and partial result buffers
   int *VecA = malloc_device<int>(N, Dev, Ctx);
@@ -51,7 +50,7 @@ int main() {
 
   // Record partial dot product on first half with Queue2, transitioning to
   // recording (fork)
-  event Join = Queue2.parallel_for(range<1>{1}, {Fork}, [=](item<1> idx) {
+  event Join = Queue2.single_task({Fork}, [=]() {
     int sum = 0;
     for (size_t i = 0; i < N / 2; i++) {
       sum += VecA[i] * VecB[i];
@@ -60,7 +59,7 @@ int main() {
   });
 
   // Record partial dot product on second half (Queue1)
-  exp_ext::parallel_for(Queue1, range<1>{1}, [=](item<1> idx) {
+  exp_ext::single_task(Queue1, [=]() {
     int sum = 0;
     for (size_t i = N / 2; i < N; i++) {
       sum += VecA[i] * VecB[i];

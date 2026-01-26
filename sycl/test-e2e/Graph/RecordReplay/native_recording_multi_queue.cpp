@@ -53,7 +53,7 @@ int main() {
   // recording (fork)
   event Join = Queue2.parallel_for(range<1>{1}, {Fork}, [=](item<1> idx) {
     int sum = 0;
-    for (size_t i = 0; i < HalfN; i++) {
+    for (size_t i = 0; i < N / 2; i++) {
       sum += VecA[i] * VecB[i];
     }
     PartialResult1[0] = sum;
@@ -62,7 +62,7 @@ int main() {
   // Record partial dot product on second half (Queue1)
   exp_ext::parallel_for(Queue1, range<1>{1}, [=](item<1> idx) {
     int sum = 0;
-    for (size_t i = HalfN; i < N; i++) {
+    for (size_t i = N / 2; i < N; i++) {
       sum += VecA[i] * VecB[i];
     }
     PartialResult2[0] = sum;

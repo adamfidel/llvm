@@ -648,6 +648,22 @@ void graph_impl::clearQueues(bool NeedsLock) {
   }
 }
 
+bool graph_impl::empty() const {
+
+  const bool UseNativeRecording = MEnableNativeRecording && MNativeGraphHandle;
+  if (!UseNativeRecording) {
+    return MNodeStorage.empty();
+  }
+
+  bool IsEmptyResult = true;
+  ur_result_t Result = urGraphIsEmptyExp(MNativeGraphHandle, &IsEmptyResult);
+  if (Result != UR_RESULT_SUCCESS) {
+    throw sycl::exception(sycl::make_error_code(errc::runtime),
+                          "Failed to check if graph is empty");
+  }
+  return IsEmptyResult;
+}
+
 bool graph_impl::checkForCycles() {
   std::list<node_impl *> SortedNodes;
   sortTopological(MRoots, SortedNodes, false);
@@ -2213,6 +2229,11 @@ std::vector<node> modifiable_command_graph::get_nodes() const {
 std::vector<node> modifiable_command_graph::get_root_nodes() const {
   graph_impl::ReadLock Lock(impl->MMutex);
   return impl->roots().to<std::vector<node>>();
+}
+
+bool modifiable_command_graph::empty() const {
+  graph_impl::ReadLock Lock(impl->MMutex);
+  return impl->empty();
 }
 
 void modifiable_command_graph::checkNodePropertiesAndThrow(

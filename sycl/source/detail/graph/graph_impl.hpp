@@ -609,7 +609,7 @@ private:
   bool MAllowBuffers = false;
 
   /// Controls whether native recording is enabled for improved performance.
-  /// Set by the SYCL_GRAPH_ENABLE_NATIVE_RECORDING environment variable.
+  /// Set by the presence of the enable_native_recording property.
   /// Note: Native recording only works with immediate command lists. Queues
   /// must either be created with
   /// ext::intel::property::queue::immediate_command_list or the global

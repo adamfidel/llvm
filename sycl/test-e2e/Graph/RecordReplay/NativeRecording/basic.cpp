@@ -1,19 +1,20 @@
-// RUN: env SYCL_PI_LEVEL_ZERO_USE_IMMEDIATE_COMMANDLISTS=1 %{build} -o %t.out
-// RUN: env SYCL_PI_LEVEL_ZERO_USE_IMMEDIATE_COMMANDLISTS=1 %{run} %t.out
+// REQUIRES: level_zero_v2_adapter && arch-intel_gpu_bmg_g21
+
+// RUN: %{build} -o %t.out
+// RUN: %{run} %t.out
 // Extra run to check for leaks in Level Zero using UR_L0_LEAKS_DEBUG
-// RUN: %if level_zero %{env SYCL_PI_LEVEL_ZERO_USE_IMMEDIATE_COMMANDLISTS=1 %{l0_leak_check} %{run} %t.out 2>&1 | FileCheck %s --implicit-check-not=LEAK %}
+// RUN: %if level_zero %{%{l0_leak_check} %{run} %t.out 2>&1 | FileCheck %s --implicit-check-not=LEAK %}
 
-// Test for enable_native_recording property with global immediate command list setting
+// Test for enable_native_recording property using queue recording mode
 
-#include "../graph_common.hpp"
+#include "../../graph_common.hpp"
 
 #include <sycl/properties/all_properties.hpp>
 
 int main() {
-  // Create a regular queue - immediate command lists will be enabled globally
-  // via the environment variable
-  // SYCL_PI_LEVEL_ZERO_USE_IMMEDIATE_COMMANDLISTS=1
-  queue Queue{{property::queue::in_order{}}};
+  // Create a queue with immediate command list property for native recording
+  queue Queue{{property::queue::in_order{},
+               ext::intel::property::queue::immediate_command_list{}}};
 
   // Create a graph with native recording enabled for improved performance
   auto MyProperties = property_list{
@@ -26,7 +27,6 @@ int main() {
   int *Data = malloc_device<int>(N, Queue);
 
   // Use queue recording mode to create the graph
-  // This should work because immediate command lists are enabled globally
   Graph.begin_recording(Queue);
 
   // Record initialization kernel

@@ -1,0 +1,84 @@
+// REQUIRES: level_zero_v2_adapter && arch-intel_gpu_bmg_g21
+
+// RUN: %{build} -lze_loader -o %t.out
+// RUN: env SYCL_GRAPH_ENABLE_NATIVE_RECORDING=1 %{run} %t.out
+// RUN: %if level_zero %{env SYCL_GRAPH_ENABLE_NATIVE_RECORDING=1 %{l0_leak_check} %{run} %t.out 2>&1 | FileCheck %s --implicit-check-not=LEAK %}
+
+// Test native recording with Level Zero memory operations.
+// Records L0 memset, device-to-device copy, and device-to-host copy
+// directly to the recording command list over an in-order queue.
+
+#include "../../graph_common.hpp"
+#include "../../ze_common.hpp"
+
+#include <level_zero/ze_api.h>
+#include <sycl/properties/all_properties.hpp>
+
+int main() {
+  // Create queue with immediate command list property for native recording
+  queue Queue{{property::queue::in_order{},
+               ext::intel::property::queue::immediate_command_list{}}};
+
+  const sycl::context Context = Queue.get_context();
+  const sycl::device Device = Queue.get_device();
+
+  // Allocate device and host memory
+  const size_t N = 1024;
+  uint32_t *DeviceSrc = malloc_device<uint32_t>(N, Queue);
+  uint32_t *DeviceDst = malloc_device<uint32_t>(N, Queue);
+  uint32_t *HostDst = malloc_host<uint32_t>(N, Queue);
+
+  // Initialize host memory to zero
+  for (size_t i = 0; i < N; i++) {
+    HostDst[i] = 0;
+  }
+
+  // Get native Level-Zero command list from queue
+  ze_command_list_handle_t ZeCommandList;
+  bool success = getCommandListFromQueue(Queue, ZeCommandList);
+  assert(success);
+
+  // Create graph for native recording
+  exp_ext::command_graph Graph{Context, Device};
+
+  // Begin recording
+  Graph.begin_recording(Queue);
+
+  // 1. Level Zero memset - fill DeviceSrc with pattern 0x42 (byte pattern)
+  uint8_t Pattern = 0x42;
+  ASSERT_ZE_RESULT_SUCCESS(zeCommandListAppendMemoryFill(
+      ZeCommandList, DeviceSrc, &Pattern, sizeof(uint8_t), N * sizeof(uint32_t),
+      nullptr, 0, nullptr));
+
+  // 2. Level Zero device-to-device copy - copy DeviceSrc to DeviceDst
+  ASSERT_ZE_RESULT_SUCCESS(
+      zeCommandListAppendMemoryCopy(ZeCommandList, DeviceDst, DeviceSrc,
+                                    N * sizeof(uint32_t), nullptr, 0, nullptr));
+
+  // 3. Level Zero device-to-host copy - copy DeviceDst to HostDst
+  ASSERT_ZE_RESULT_SUCCESS(
+      zeCommandListAppendMemoryCopy(ZeCommandList, HostDst, DeviceDst,
+                                    N * sizeof(uint32_t), nullptr, 0, nullptr));
+
+  // End recording
+  Graph.end_recording(Queue);
+
+  // Finalize and execute the graph
+  auto ExecutableGraph = Graph.finalize();
+  Queue.submit([&](handler &CGH) { CGH.ext_oneapi_graph(ExecutableGraph); });
+  Queue.wait();
+
+  // Verify results on host
+  // Pattern 0x42 repeated 4 times (for uint32_t) = 0x42424242
+  uint32_t Expected = 0x42424242;
+  for (size_t i = 0; i < N; i++) {
+    assert(check_value(i, Expected, HostDst[i], "HostDst"));
+  }
+
+  // Cleanup after graph is destroyed
+  free(DeviceSrc, Queue);
+  free(DeviceDst, Queue);
+  free(HostDst, Queue);
+
+  return 0;
+}

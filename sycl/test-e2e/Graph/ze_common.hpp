@@ -115,13 +115,13 @@ public:
   void cleanup() {
     // Destroy kernels first (they depend on modules)
     for (auto kernel : Kernels) {
-      zeKernelDestroy(kernel);
+      ASSERT_ZE_RESULT_SUCCESS(zeKernelDestroy(kernel));
     }
     Kernels.clear();
 
     // Then destroy modules
     for (auto module : Modules) {
-      zeModuleDestroy(module);
+      ASSERT_ZE_RESULT_SUCCESS(zeModuleDestroy(module));
     }
     Modules.clear();
   }

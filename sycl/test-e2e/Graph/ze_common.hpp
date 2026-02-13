@@ -38,12 +38,6 @@ inline std::vector<uint8_t> loadSpirvFromFile(const std::string &FileName) {
   return Spv;
 }
 
-/// Get the native Level Zero command list from a SYCL queue with immediate
-/// command list property
-/// @param Queue SYCL queue with immediate command list property
-/// @param[out] ZeCommandList Level Zero command list handle
-/// @return true on success, false if the queue doesn't have an immediate
-/// command list
 inline bool getCommandListFromQueue(sycl::queue &Queue,
                                     ze_command_list_handle_t &ZeCommandList) {
   using namespace sycl;
@@ -118,7 +112,6 @@ public:
     return kernel;
   }
 
-  /// Manually cleanup all resources (called automatically by destructor)
   void cleanup() {
     // Destroy kernels first (they depend on modules)
     for (auto kernel : Kernels) {

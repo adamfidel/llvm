@@ -15,33 +15,26 @@
 #include <sycl/properties/all_properties.hpp>
 
 int main() {
-  // Create queue with immediate command list property for native recording
-  queue Queue{{property::queue::in_order{},
-               ext::intel::property::queue::immediate_command_list{}}};
+  queue Queue{property::queue::in_order{}};
 
   const sycl::context Context = Queue.get_context();
   const sycl::device Device = Queue.get_device();
 
-  // Allocate device and host memory
   const size_t N = 1024;
   uint32_t *DeviceSrc = malloc_device<uint32_t>(N, Queue);
   uint32_t *DeviceDst = malloc_device<uint32_t>(N, Queue);
   uint32_t *HostDst = malloc_host<uint32_t>(N, Queue);
 
-  // Initialize host memory to zero
   for (size_t i = 0; i < N; i++) {
     HostDst[i] = 0;
   }
 
-  // Get native Level-Zero command list from queue
   ze_command_list_handle_t ZeCommandList;
   bool success = getCommandListFromQueue(Queue, ZeCommandList);
   assert(success);
 
-  // Create graph for native recording
   exp_ext::command_graph Graph{Context, Device};
 
-  // Begin recording
   Graph.begin_recording(Queue);
 
   // 1. Level Zero memset - fill DeviceSrc with pattern 0x42 (byte pattern)
@@ -60,10 +53,8 @@ int main() {
       zeCommandListAppendMemoryCopy(ZeCommandList, HostDst, DeviceDst,
                                     N * sizeof(uint32_t), nullptr, 0, nullptr));
 
-  // End recording
   Graph.end_recording(Queue);
 
-  // Finalize and execute the graph
   auto ExecutableGraph = Graph.finalize();
   Queue.submit([&](handler &CGH) { CGH.ext_oneapi_graph(ExecutableGraph); });
   Queue.wait();
@@ -75,7 +66,6 @@ int main() {
     assert(check_value(i, Expected, HostDst[i], "HostDst"));
   }
 
-  // Cleanup after graph is destroyed
   free(DeviceSrc, Queue);
   free(DeviceDst, Queue);
   free(HostDst, Queue);

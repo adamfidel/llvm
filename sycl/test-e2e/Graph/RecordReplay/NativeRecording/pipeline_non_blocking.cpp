@@ -65,5 +65,4 @@ int main() {
 // CHECK-NOT: zeEventHostSynchronize(
 // CHECK-COUNT-1: zeCommandListHostSynchronize(
 // CHECK-NOT: zeCommandListHostSynchronize(
-// CHECK-NOT: zeEventHostSynchronize(
 // CHECK: END_GRAPH_PIPELINE

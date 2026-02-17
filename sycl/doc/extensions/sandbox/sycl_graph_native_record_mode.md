@@ -125,7 +125,7 @@ Zero API calls within the same recording session. Because the underlying immedia
 in L0 graph-recording mode, both SYCL-lowered commands and raw L0 commands are captured into
 the same graph.
 
-## 5. Usage Example
+## Usage Example
 
 The following example shows how an application can use Native Recording to capture a
 graph that includes both SYCL and direct Level Zero kernel launches.

@@ -38,10 +38,10 @@ int main() {
   Graph.begin_recording(Queue);
 
   // 1. Level Zero memset - fill DeviceSrc with pattern 0x42 (byte pattern)
-  uint8_t Pattern = 0x42;
+  uint32_t Pattern = 0x42;
   ASSERT_ZE_RESULT_SUCCESS(zeCommandListAppendMemoryFill(
-      ZeCommandList, DeviceSrc, &Pattern, sizeof(uint8_t), N * sizeof(uint32_t),
-      nullptr, 0, nullptr));
+      ZeCommandList, DeviceSrc, &Pattern, sizeof(uint32_t),
+      N * sizeof(uint32_t), nullptr, 0, nullptr));
 
   // 2. Level Zero device-to-device copy - copy DeviceSrc to DeviceDst
   ASSERT_ZE_RESULT_SUCCESS(
@@ -60,10 +60,8 @@ int main() {
   Queue.wait();
 
   // Verify results on host
-  // Pattern 0x42 repeated 4 times (for uint32_t) = 0x42424242
-  uint32_t Expected = 0x42424242;
   for (size_t i = 0; i < N; i++) {
-    assert(check_value(i, Expected, HostDst[i], "HostDst"));
+    assert(check_value(i, Pattern, HostDst[i], "HostDst"));
   }
 
   free(DeviceSrc, Queue);

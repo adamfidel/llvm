@@ -10,9 +10,11 @@
 #include <level_zero/ze_api.h>
 #include <sycl/properties/all_properties.hpp>
 
+constexpr size_t N = 1024;
+
 void ZE_APICALL HostFunction(void *UserData) {
   uint32_t *Data = static_cast<uint32_t *>(UserData);
-  for (size_t i = 0; i < 1024; i++) {
+  for (size_t i = 0; i < N; i++) {
     Data[i] = Data[i] * 3;
   }
 }
@@ -32,7 +34,6 @@ int main() {
                               zeCommandListAppendHostFunction));
 
   // Allocate shared memory (accessible from both device and host)
-  const size_t N = 1024;
   uint32_t *DataShared = malloc_shared<uint32_t>(N, Queue);
 
   exp_ext::command_graph Graph{Context, Device};

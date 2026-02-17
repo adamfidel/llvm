@@ -125,9 +125,9 @@ Zero API calls within the same recording session. Because the underlying immedia
 in L0 graph-recording mode, both SYCL-lowered commands and raw L0 commands are captured into
 the same graph.
 
-## 5. Usage Example (PyTorch)
+## 5. Usage Example
 
-The following example shows how a framework like PyTorch can use Native Recording to capture a
+The following example shows how an application can use Native Recording to capture a
 graph that includes both SYCL and direct Level Zero kernel launches.
 
 ### Step 1: Create graph and begin recording
@@ -144,8 +144,7 @@ graph.begin_recording(queue);
 ```
 
 At this point the underlying Level Zero immediate command list is placed into recording mode.
-Any framework-level prologue work (memory-pool preparation, RNG state setup, etc.) can be
-performed here and will be captured.
+
 
 ### Step 2: Submit commands (SYCL and/or Level Zero)
 
@@ -173,7 +172,7 @@ zeCommandListAppendLaunchKernelWithParameters(
 );
 ```
 
-SYCL kernel submissions via `queue1.submit(...)` can be freely interleaved with these direct
+SYCL kernel submissions via `queue.submit(...)` can be freely interleaved with these direct
 L0 calls — all commands are captured into the same graph.
 
 ### Step 3: Finalize and execute
@@ -193,7 +192,7 @@ After `end_recording()`, an executable graph object is created and
 
 | Limitation          | Description                                                                                                                         |
 | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| **SYCL Host tasks** | SYCL-level host tasks (as opposed to L0 host tasks) require new runtime support that is currently being developed by the SYCL team. |
+| SYCL Host tasks | SYCL-level host tasks (as opposed to L0 host tasks) require new runtime support that is currently being developed by the SYCL team. |
 
 If host tasks are needed, directly using `zeCommandListAppendHostFunction` can be used as a workaround until SYCL support is added. Attempting to record via the `sycl::handler::host_task` API will lead to correctness issues in your application.
 
@@ -201,18 +200,18 @@ If host tasks are needed, directly using `zeCommandListAppendHostFunction` can b
 
 | Limitation                               | Description                                                                                                                                              |
 | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Graph update / Mutable command lists** | Updating a finalized graph (e.g., changing kernel arguments) requires mutable command list support, which is not supported by the Level Zero Graph APIs. |
-| **Asynchronous memory allocation** | Async allocation during recording is not yet supported by Level Zero Graph.                  |
-| **Explicit graph API**             | The explicit (non-record-and-replay) graph construction API is not supported in native mode. |
-| **Single-root node graph**             | Graphs with more than one root node are not supported in native mode. |
+| Graph update / Mutable command lists | Updating a finalized graph (e.g., changing kernel arguments) requires mutable command list support, which is not supported by the Level Zero Graph APIs. |
+| Asynchronous memory allocation | Async allocation during recording is not yet supported by Level Zero Graph.                  |
+| Explicit graph API             | The explicit (non-record-and-replay) graph construction API is not supported in native mode. |
 
 The following restrictions are inherent to Level Zero Graph and apply to any graph recorded in
 native mode:
 
-1. **Immediate command lists only** — Regular (non-immediate) command list operations are not
+1. Immediate command lists only: Regular (non-immediate) command list operations are not
    supported during recording.
-2. **No synchronous calls** — Synchronous waits inside a recording session are not permitted.
-3. **All forks must be joined** — Every divergent path in the graph must reconverge. For example,
+2. Single root graphs: Graphs with more than one root node (i.e., forests) are not supported in native mode.
+3. No synchronous calls: Synchronous waits inside a recording session are not permitted.
+4. All forks must be joined: Every divergent path in the graph must reconverge. For example,
    if two queues exist and one is in recording mode while the other is not, any commands submitted
    to the non-recording queue must be synchronized back through the recording queue before the
    recording ends. 

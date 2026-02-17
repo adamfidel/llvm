@@ -1,7 +1,7 @@
 # SYCL Graph Native Recording 
 ## Introduction
 
-This document describes the design of **Native Recording mode** for SYCL Graph. Native Recording
+This document describes the design of the proposed 'Native Recording' mode for SYCL Graph. Native Recording
 enables SYCL Graph to directly leverage Level Zero Graph APIs during record-and-replay, rather than
 going through Unified Runtime's `Command-Buffer` abstraction. 
 
@@ -19,7 +19,7 @@ Level Zero command lists).
 sequenceDiagram
     participant User as User Code
     participant SYCL as SYCL Runtime
-    participant L0 as Level Zero Driver
+    participant UR as Unified Runtime
 
     User->>SYCL: graph.begin_recording(queue)
     SYCL->>SYCL: Enable SYCL-level command caching
@@ -35,26 +35,28 @@ sequenceDiagram
     User->>SYCL: graph.finalize()
     SYCL->>SYCL: Walk cached commands
     loop For each cached command
-        SYCL->>L0: Construct UR Command-Buffer entry
+        SYCL->>UR: Construct UR Command-Buffer entry
     end
-    L0-->>SYCL: Executable command buffer
+    UR-->>SYCL: Executable command buffer
 
     User->>SYCL: queue.ext_oneapi_graph(graph_exec)
-    SYCL->>L0: Submit command buffer
-    L0-->>L0: Execute
+    SYCL->>UR: Submit command buffer
+    UR-->>UR: Execute
 ```
 
 This approach has a few drawbacks:
 
-1. **Performance overhead**: caching at the SYCL level and then replaying through UR adds latency
+1. Performance overhead: caching at the SYCL level and then replaying through UR adds latency
    compared to capturing directly at the driver level.
-2. **No native interoperability**: Level Zero commands issued outside of SYCL (e.g., via
+2. No native interoperability: Level Zero commands issued outside of SYCL (e.g., via
    `zeCommandListAppend*`) cannot be captured into the graph without workarounds such as the SYCL
    native-handle escape hatch, which requires code changes on the user side.
 
 
-Level Zero recently introduced a set of experimental APIs that enable **graph-level capture** of
-commands submitted to immediate command lists.
+Level Zero recently introduced a set of experimental APIs that enable graph-level capture of
+commands submitted to immediate command lists. This API can be used via Unified Runtime's new
+graph API (introduced in [intel/llvm#20860](https://github.com/intel/llvm/pull/20860)) which contains
+functions such as `urQueueBeginCaptureIntoGraphExp` and `urEnqueueGraphExp`.
 
 ## Design Overview
 
@@ -99,8 +101,8 @@ sequenceDiagram
 
 | Phase         | Mechanism                                                                                                  |
 |---------------|------------------------------------------------------------------------------------------------------------|
-| **Development** | Set the environment variable `SYCL_GRAPH_ENABLE_NATIVE_RECORDING=1`.                                    |
-| **Release**     | Pass a SYCL property to the `command_graph` constructor to opt in to native recording at graph creation. |
+| During Development | Set the environment variable `SYCL_GRAPH_ENABLE_NATIVE_RECORDING=1`.                                    |
+| After Release     | Pass a SYCL property to the `command_graph` constructor to opt in to native recording at graph creation. |
 
 When native recording is not enabled, the existing Command-Buffer path is used unchanged.
 

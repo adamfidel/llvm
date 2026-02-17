@@ -47,22 +47,24 @@ sequenceDiagram
 This approach has a few drawbacks:
 
 1. Performance overhead: caching at the SYCL level and then replaying through UR adds latency
-   compared to capturing directly at the driver level.
+   compared to capturing directly by Level Zero.
 2. No native interoperability: Level Zero commands issued outside of SYCL (e.g., via
    `zeCommandListAppend*`) cannot be captured into the graph without workarounds such as the SYCL
    native-handle escape hatch, which requires code changes on the user side.
-
+3. Blocking submissions: when submitting multiple copies of a graph to a queue, there needs to be a synchronization between successive executions which is not necessary with native recording.
 
 Level Zero recently introduced a set of experimental APIs that enable graph-level capture of
 commands submitted to immediate command lists. This API can be used via Unified Runtime's new
 graph API (introduced in [intel/llvm#20860](https://github.com/intel/llvm/pull/20860)) which contains
 functions such as `urQueueBeginCaptureIntoGraphExp` and `urEnqueueGraphExp`.
 
+All three drawbacks are addressed using the proposed Native Recording mode for SYCL Graph.
+
 ## Design Overview
 
 Our goal is to introduce a Native Recording mode for SYCL Graph that, when enabled, bypasses the UR
 Command-Buffer path and instead puts the underlying Level Zero immediate command list into
-graph-recording mode. All commands, whether submitted via SYCL or directly via Level Zero APIs,
+graph-recording mode (via the new UR Graph API). All commands, whether submitted via SYCL or directly via Level Zero APIs,
 are captured by Level Zero and finalized into an executable Level Zero graph.
 
 ### High-Level Flow
@@ -71,29 +73,39 @@ are captured by Level Zero and finalized into an executable Level Zero graph.
 sequenceDiagram
     participant User as User Code
     participant SYCL as SYCL Runtime
+    participant UR as Unified Runtime
     participant L0 as Level Zero Driver
 
     User->>SYCL: graph.begin_recording(queue)
-    SYCL->>L0: Put immediate command list into recording mode
+    SYCL->>UR: urQueueBeginCaptureIntoGraphExp()
+    UR->>L0: Put immediate command list into recording mode
 
     User->>SYCL: queue.submit(kernel_1)
-    SYCL->>L0: Lower to L0 command (captured by L0 Graph)
+    SYCL->>UR: urEnqueueKernelLaunch()
+    UR->>L0: Lower to L0 command (captured by L0 Graph)
 
-    User->>L0: zeCommandListAppendLaunchKernel(kernel_2)
+    User->>L0: zeCommandListAppendLaunchKernelWithParameters(kernel_2)
     Note right of L0: Direct L0 call also captured
 
     User->>SYCL: queue.submit(kernel_3)
-    SYCL->>L0: Lower to L0 command (captured by L0 Graph)
+    SYCL->>UR: urEnqueueKernelLaunch()
+    UR->>L0: Lower to L0 command (captured by L0 Graph)
 
     User->>SYCL: graph.end_recording()
-    SYCL->>L0: End recording mode
+    SYCL->>UR: urQueueEndGraphCaptureExp()
+    UR->>L0: End recording mode
+    L0-->>UR: L0 graph object
+    UR-->>SYCL: ur_exp_graph_handle_t
 
     User->>SYCL: graph.finalize()
-    SYCL->>L0: Finalize L0 Graph
-    L0-->>SYCL: Executable graph
+    SYCL->>UR: urGraphInstantiateGraphExp()
+    UR->>L0: Instantiate executable graph
+    L0-->>UR: L0 executable graph
+    UR-->>SYCL: ur_exp_graph_exec_handle_t
 
     User->>SYCL: queue.ext_oneapi_graph(graph_exec)
-    SYCL->>L0: Submit executable graph
+    SYCL->>UR: urEnqueueGraphExp()
+    UR->>L0: Submit executable graph
     L0-->>L0: Execute
 ```
 
@@ -143,7 +155,7 @@ auto native_queue_variant = sycl::get_native<sycl::backend::ext_oneapi_level_zer
 ze_command_list_handle_t native_cmdlist = std::get<ze_command_list_handle_t>(native_queue_variant);
 
 // Launch a kernel via Level Zero directly
-zeIntelCommandListAppendLaunchKernelExp(
+zeCommandListAppendLaunchKernelWithParameters(
     native_cmdlist,
     hKernel_1,
     launchKernelArgs_1,
@@ -152,7 +164,7 @@ zeIntelCommandListAppendLaunchKernelExp(
 );
 
 // Launch another kernel
-zeIntelCommandListAppendLaunchKernelExp(
+zeCommandListAppendLaunchKernelWithParameters(
     native_cmdlist,
     hKernel_2,
     launchKernelArgs_2,
@@ -182,6 +194,8 @@ After `end_recording()`, an executable graph object is created and
 | Limitation          | Description                                                                                                                         |
 | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | **SYCL Host tasks** | SYCL-level host tasks (as opposed to L0 host tasks) require new runtime support that is currently being developed by the SYCL team. |
+
+If host tasks are needed, directly using `zeCommandListAppendHostFunction` can be used as a workaround until SYCL support is added. Attempting to record via the `sycl::handler::host_task` API will lead to correctness issues in your application.
 
 ### Not Supported
 

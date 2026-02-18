@@ -1,4 +1,11 @@
 # SYCL Graph Native Recording 
+
+NOTE: This specification has been updated and moved to https://fictional-adventure-jnwzlro.pages.github.io/design-docs/native-recording.html.
+
+The previous copy has been preserved below.
+
+---
+
 ## Introduction
 
 This document describes the design of the proposed 'Native Recording' mode for SYCL Graph. Native Recording

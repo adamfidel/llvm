@@ -2268,9 +2268,8 @@ executable_command_graph::executable_command_graph(
 }
 
 void executable_command_graph::finalizeImpl() {
-  // Skip partition creation and command buffer creation for native recording
-  // path The native UR graph was already instantiated in exec_graph_impl
-  // constructor
+  // Partitions and command buffers are not used for native recording and
+  // instantiation is fully performed in the exec_graph_impl constructor.
   if (!impl->getNativeExecutableGraphHandle()) {
     impl->makePartitions();
 

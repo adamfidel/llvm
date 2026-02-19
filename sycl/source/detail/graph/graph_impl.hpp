@@ -688,7 +688,7 @@ public:
 
   /// Enqueue a native UR graph (used when native recording is enabled).
   /// @param Queue Command-queue to schedule execution on.
-  /// @param CGData Command-group data provided by the sycl::handler
+  /// @param CGData Command-group data for waitlist event dependencies.
   /// @param EventNeeded Whether an event signalling the completion of this
   /// operation needs to be returned.
   /// @return Returns a pair of an event and a boolean indicating whether the

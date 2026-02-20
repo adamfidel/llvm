@@ -315,8 +315,10 @@ graph_impl::graph_impl(const sycl::context &SyclContext,
   if (PropList.has_property<property::graph::assume_buffer_outlives_graph>()) {
     MAllowBuffers = true;
   }
-  // Check environment variable for native recording mode
-  if (SYCLConfig<SYCL_GRAPH_ENABLE_NATIVE_RECORDING>::get()) {
+  // Check property or environment variable for native recording mode
+  // Either can enable native recording
+  if (PropList.has_property<property::graph::enable_native_recording>() ||
+      SYCLConfig<SYCL_GRAPH_ENABLE_NATIVE_RECORDING>::get()) {
     MEnableNativeRecording = true;
     // Create native UR graph when native recording is enabled
     // Note: Native recording only works with immediate command lists,

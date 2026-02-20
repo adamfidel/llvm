@@ -691,11 +691,10 @@ public:
   /// @param CGData Command-group data for waitlist event dependencies.
   /// @param EventNeeded Whether an event signalling the completion of this
   /// operation needs to be returned.
-  /// @return Returns a pair of an event and a boolean indicating whether the
-  /// scheduler was bypassed.
-  std::pair<EventImplPtr, bool>
-  enqueueNative(sycl::detail::queue_impl &Queue,
-                sycl::detail::CG::StorageInitHelper CGData, bool EventNeeded);
+  /// @return Returns an event if requested and nullptr otherwise.
+  EventImplPtr enqueueNative(sycl::detail::queue_impl &Queue,
+                             sycl::detail::CG::StorageInitHelper CGData,
+                             bool EventNeeded);
 
   /// Iterates through all the nodes in the graph to build the list of
   /// accessor requirements for the whole graph and for each partition.

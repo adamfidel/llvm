@@ -1338,13 +1338,10 @@ exec_graph_impl::enqueuePartitions(sycl::detail::queue_impl &Queue,
   return SignalEvent;
 }
 
-std::pair<EventImplPtr, bool>
+EventImplPtr
 exec_graph_impl::enqueueNative(sycl::detail::queue_impl &Queue,
                                sycl::detail::CG::StorageInitHelper CGData,
                                bool EventNeeded) {
-  // Native graph submission never goes through SYCL scheduler
-  constexpr bool SkipScheduler = true;
-
   // Create a list containing all the UR event handles in WaitEvents.
   // WaitEvents is assumed to be safe for scheduler bypass and any
   // host-task events that it contains can be ignored.
@@ -1360,13 +1357,13 @@ exec_graph_impl::enqueueNative(sycl::detail::queue_impl &Queue,
   const size_t UrEnqueueWaitListSize = UrEventHandles.size();
   ur_event_handle_t *UrEnqueueWaitList =
       UrEnqueueWaitListSize == 0 ? nullptr : UrEventHandles.data();
+  EventImplPtr NewEvent = nullptr;
   if (!EventNeeded) {
     Queue.getAdapter().call<sycl::detail::UrApiKind::urEnqueueGraphExp>(
         Queue.getHandleRef(), MNativeExecutableGraphHandle,
         UrEnqueueWaitListSize, UrEnqueueWaitList, nullptr);
-    return {nullptr, SkipScheduler};
   } else {
-    auto NewEvent = sycl::detail::event_impl::create_device_event(Queue);
+    NewEvent = sycl::detail::event_impl::create_device_event(Queue);
     NewEvent->setContextImpl(Queue.getContextImpl());
     NewEvent->setStateIncomplete();
     NewEvent->setSubmissionTime();
@@ -1379,8 +1376,8 @@ exec_graph_impl::enqueueNative(sycl::detail::queue_impl &Queue,
     if (MEnableProfiling) {
       NewEvent->setProfilingEnabled(MEnableProfiling);
     }
-    return {NewEvent, SkipScheduler};
   }
+  return NewEvent;
 }
 
 std::pair<EventImplPtr, bool>
@@ -1390,7 +1387,8 @@ exec_graph_impl::enqueue(sycl::detail::queue_impl &Queue,
   WriteLock Lock(MMutex);
   // Use native recording path if available
   if (MNativeExecutableGraphHandle) {
-    return enqueueNative(Queue, std::move(CGData), EventNeeded);
+    return {enqueueNative(Queue, std::move(CGData), EventNeeded),
+            /*SkipScheduler=*/true};
   }
 
   // Command buffer path

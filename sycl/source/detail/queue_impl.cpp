@@ -568,6 +568,22 @@ EventImplPtr queue_impl::submit_command_to_graph(
           ? UserFacingNodeType
           : ext::oneapi::experimental::detail::getNodeTypeFromCG(CGType);
 
+  // Native recording limitations: validate unsupported command types
+  if (GraphImpl.isNativeRecordingEnabled()) {
+    if (CGType == sycl::detail::CGType::CodeplayHostTask) {
+      throw sycl::exception(
+          make_error_code(errc::feature_not_supported),
+          "SYCL host_task is not supported in native recording mode. Use "
+          "zeCommandListAppendHostFunction as a workaround");
+    }
+    if (CGType == sycl::detail::CGType::AsyncAlloc ||
+        CGType == sycl::detail::CGType::AsyncFree) {
+      throw sycl::exception(
+          make_error_code(errc::feature_not_supported),
+          "Asynchronous memory allocation not supported in native recording mode.");
+    }
+  }
+
   // Create a new node in the graph representing this command-group
   if (isInOrder()) {
     // In-order queues create implicit linear dependencies between nodes.

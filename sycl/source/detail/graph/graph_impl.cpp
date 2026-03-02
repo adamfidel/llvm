@@ -452,6 +452,14 @@ void graph_impl::markCGMemObjs(
 }
 
 node_impl &graph_impl::add(nodes_range Deps) {
+  // Native recording limitation: explicit API not supported
+  if (MEnableNativeRecording) {
+    throw sycl::exception(
+        make_error_code(errc::feature_not_supported),
+        "graph.add(): The explicit graph API is not supported in native "
+        "recording mode. Use the record-and-replay API instead.");
+  }
+
   node_impl &NodeImpl = createNode();
 
   addDepsToNode(NodeImpl, Deps);
@@ -464,6 +472,14 @@ node_impl &graph_impl::add(nodes_range Deps) {
 node_impl &graph_impl::add(std::function<void(handler &)> CGF,
                            const std::vector<sycl::detail::ArgDesc> &Args,
                            nodes_range Deps) {
+  // Native recording limitation: explicit API not supported
+  if (MEnableNativeRecording) {
+    throw sycl::exception(
+        make_error_code(errc::feature_not_supported),
+        "graph.add(): The explicit graph API is not supported in native "
+        "recording mode. Use the record-and-replay API instead.");
+  }
+
   (void)Args;
   detail::handler_impl HandlerImpl{*this};
   sycl::handler Handler{HandlerImpl};
@@ -534,6 +550,13 @@ node_impl &graph_impl::add(std::function<void(handler &)> CGF,
 node_impl &graph_impl::add(node_type NodeType,
                            std::shared_ptr<sycl::detail::CG> CommandGroup,
                            nodes_range Deps) {
+  // Native recording limitation: explicit API not supported
+  if (MEnableNativeRecording) {
+    throw sycl::exception(
+        make_error_code(errc::feature_not_supported),
+        "graph.add(): The explicit graph API is not supported in native "
+        "recording mode. Use the record-and-replay API instead.");
+  }
 
   // A unique set of dependencies obtained by checking requirements and events
   std::set<node_impl *> UniqueDeps = getCGEdges(CommandGroup);
@@ -561,6 +584,14 @@ node_impl &graph_impl::add(node_type NodeType,
 node_impl &
 graph_impl::add(std::shared_ptr<dynamic_command_group_impl> &DynCGImpl,
                 nodes_range Deps) {
+  // Native recording limitation: explicit API not supported
+  if (MEnableNativeRecording) {
+    throw sycl::exception(
+        make_error_code(errc::feature_not_supported),
+        "graph.add(): The explicit graph API is not supported in native "
+        "recording mode. Use the record-and-replay API instead.");
+  }
+
   // Set of Dependent nodes based on CG event and accessor dependencies.
   std::set<node_impl *> DynCGDeps = getCGEdges(DynCGImpl->MCommandGroups[0]);
   for (unsigned i = 1; i < DynCGImpl->getNumCGs(); i++) {
@@ -764,6 +795,16 @@ std::vector<sycl::detail::EventImplPtr> graph_impl::getExitNodesEvents(
 void graph_impl::beginRecordingImpl(sycl::detail::queue_impl &Queue,
                                     bool LockQueue) {
   graph_impl::WriteLock Lock(MMutex);
+
+  // Native recording limitation: single queue at a time
+  if (MEnableNativeRecording && !MRecordingQueues.empty()) {
+    throw sycl::exception(
+        make_error_code(errc::feature_not_supported),
+        "Native recording does not support recording the same graph to "
+        "multiple queues simultaneously. End recording on the current "
+        "queue before beginning on another.");
+  }
+
   if (!Queue.hasCommandGraph()) {
 
     // Use native UR graph recording if enabled

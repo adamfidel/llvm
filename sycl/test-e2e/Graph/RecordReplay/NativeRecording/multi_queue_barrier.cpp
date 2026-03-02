@@ -31,8 +31,6 @@ int main() {
     assert(Queue2.ext_oneapi_get_state() == ExpectedQ2);
   };
 
-  // Create a graph - native recording is enabled via
-  // SYCL_GRAPH_ENABLE_NATIVE_RECORDING environment variable
   exp_ext::command_graph Graph{Ctx, Dev};
 
   const size_t N = 1024;
@@ -86,12 +84,12 @@ int main() {
   Queue1.memcpy(HostVecA.data(), VecA, N * sizeof(int)).wait();
   Queue1.memcpy(HostVecB.data(), VecB, N * sizeof(int)).wait();
 
-  // VecA: 1 -> +1 = 2 -> *2 = 4
+  // VecA: 1 + 1 * 2 = 4
   for (size_t i = 0; i < N; i++) {
     assert(HostVecA[i] == 4);
   }
 
-  // VecB: 2 -> *3 = 6 -> +1 = 7
+  // VecB: 2 * 3 + 1 = 7
   for (size_t i = 0; i < N; i++) {
     assert(HostVecB[i] == 7);
   }

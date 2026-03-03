@@ -14,6 +14,7 @@
 #include <sycl/ext/oneapi/experimental/enqueue_functions.hpp>
 #include <sycl/properties/all_properties.hpp>
 
+#include <algorithm>
 #include <vector>
 
 int main() {
@@ -86,14 +87,10 @@ int main() {
   Queue1.memcpy(HostVecB.data(), VecB, N * sizeof(int)).wait();
 
   // VecA: 1 + 1 * 2 = 4
-  for (size_t i = 0; i < N; i++) {
-    assert(HostVecA[i] == 4);
-  }
+  assert(std::count(HostVecA.begin(), HostVecA.end(), 4) == N);
 
   // VecB: 2 * 3 + 1 = 7
-  for (size_t i = 0; i < N; i++) {
-    assert(HostVecB[i] == 7);
-  }
+  assert(std::count(HostVecB.begin(), HostVecB.end(), 7) == N);
 
   free(VecA, Ctx);
   free(VecB, Ctx);

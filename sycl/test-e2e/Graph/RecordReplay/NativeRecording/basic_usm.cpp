@@ -5,7 +5,8 @@
 // Extra run to check for leaks in Level Zero using UR_L0_LEAKS_DEBUG
 // RUN: %if level_zero %{env SYCL_GRAPH_ENABLE_NATIVE_RECORDING=1 %{l0_leak_check} %{run} %t.out 2>&1 | FileCheck %s --implicit-check-not=LEAK %}
 
-// Reuse of basic_usm.cpp that assesses out-of-order queue functionality with a diamond dependency.
+// Reuse of basic_usm.cpp that assesses out-of-order queue functionality with a
+// diamond dependency.
 
 #define GRAPH_E2E_RECORD_REPLAY
 

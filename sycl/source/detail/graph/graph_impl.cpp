@@ -800,9 +800,14 @@ void graph_impl::beginRecordingImpl(sycl::detail::queue_impl &Queue,
   if (MEnableNativeRecording && !MRecordingQueues.empty()) {
     throw sycl::exception(
         make_error_code(errc::feature_not_supported),
-        "Native recording does not support recording the same graph to "
-        "multiple queues simultaneously. End recording on the current "
-        "queue before beginning on another.");
+        "Recording the same graph to multiple queues is not supported in native mode");
+  }
+
+  // Native recording limitation: in-order queues only
+  if (MEnableNativeRecording && !Queue.isInOrder()) {
+    throw sycl::exception(
+        make_error_code(errc::feature_not_supported),
+        "Native recording only works with in-order queues");
   }
 
   if (!Queue.hasCommandGraph()) {

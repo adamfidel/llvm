@@ -11,6 +11,7 @@
 #include <fstream>
 #include <mutex> // std::mutex, std::unique_lock
 #include <numeric>
+#include <utility>
 
 #if GRAPH_TESTS_VERBOSE_PRINT
 #include <chrono>

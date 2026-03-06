@@ -79,10 +79,8 @@ int main() {
   Queue1.memcpy(HostVecA_Check.data(), VecA, N * sizeof(int)).wait();
   Queue1.memcpy(HostVecB_Check.data(), VecB, N * sizeof(int)).wait();
 
-  assert(std::count(HostVecA_Check.begin(), HostVecA_Check.end(), 555) == N &&
-         "VecA should still be 555 after recording (no eager execution)");
-  assert(std::count(HostVecB_Check.begin(), HostVecB_Check.end(), 555) == N &&
-         "VecB should still be 555 after recording (no eager execution)");
+  assert(std::count(HostVecA_Check.begin(), HostVecA_Check.end(), 555) == N);
+  assert(std::count(HostVecB_Check.begin(), HostVecB_Check.end(), 555) == N);
 
   // Finalize and execute the graph
   auto ExecutableGraph = Graph.finalize();

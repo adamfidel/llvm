@@ -36,7 +36,6 @@ int main() {
   exp_ext::command_graph Graph{Context, Device};
 
   CommandListStateVerifier verifier(ZeCommandList);
-
   verifier.verify(EXECUTING);
 
   Graph.begin_recording(Queue);

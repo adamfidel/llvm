@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cassert>
 #include <fstream>
 #include <iostream>
@@ -8,7 +9,18 @@
 #include <variant>
 #include <vector>
 
+#include "graph_common.hpp"
+
 #define ASSERT_ZE_RESULT_SUCCESS(status) assert((status) == ZE_RESULT_SUCCESS);
+
+// Level Zero graph extension result codes
+// These are returned by zeCommandListIsGraphCaptureEnabledExp
+#ifndef ZE_RESULT_QUERY_TRUE
+#define ZE_RESULT_QUERY_TRUE ((ze_result_t)0x7fff0000)
+#endif
+#ifndef ZE_RESULT_QUERY_FALSE
+#define ZE_RESULT_QUERY_FALSE ((ze_result_t)0x7fff0001)
+#endif
 
 inline ze_result_t getDriver(ze_driver_handle_t &ZeDriver) {
   uint32_t DriverCount = 0;
@@ -54,6 +66,9 @@ inline bool getCommandListFromQueue(sycl::queue &Queue,
 typedef ze_result_t(ZE_APICALL *zeCommandListAppendHostFunction_fn)(
     ze_command_list_handle_t, void *, void *, void *, ze_event_handle_t,
     uint32_t, ze_event_handle_t *);
+
+typedef ze_result_t(ZE_APICALL *zeCommandListIsGraphCaptureEnabledExp_fn)(
+    ze_command_list_handle_t);
 
 template <typename FunctionPtr>
 inline ze_result_t loadZeExtensionFunction(ze_driver_handle_t ZeDriver,
@@ -133,3 +148,105 @@ private:
   std::vector<ze_module_handle_t> Modules;
   std::vector<ze_kernel_handle_t> Kernels;
 };
+
+// Verify recording states of one or more command lists
+template <size_t N> class CommandListStateVerifier {
+  std::array<ze_command_list_handle_t, N> commandLists;
+  mutable zeCommandListIsGraphCaptureEnabledExp_fn pfnIsGraphCaptureEnabled =
+      nullptr;
+  mutable bool extensionLoaded = false;
+
+public:
+  /// Constructor: stores command list handles and loads extension
+  template <typename... CommandLists>
+  CommandListStateVerifier(CommandLists... cmdLists)
+      : commandLists{cmdLists...} {
+    static_assert(sizeof...(CommandLists) == N,
+                  "Number of command lists must match template parameter");
+    loadExtension();
+  }
+
+  /// Verify that each command list has the expected state
+  template <typename... States> void verify(States... expected_states) {
+    static_assert(sizeof...(States) == N,
+                  "Number of states must match number of command lists");
+    static_assert((std::is_same_v<States, exp_ext::queue_state> && ...),
+                  "All states must be exp_ext::queue_state");
+
+    verifyImpl(std::index_sequence_for<States...>{}, expected_states...);
+  }
+
+private:
+  /// Load the Level Zero extension function (called once in constructor)
+  void loadExtension() const {
+    if (extensionLoaded) {
+      return;
+    }
+    extensionLoaded = true;
+
+    ze_driver_handle_t driver;
+    ze_result_t status = getDriver(driver);
+    if (status != ZE_RESULT_SUCCESS) {
+      std::cerr << "Warning: Failed to get Level Zero driver (status=" << status
+                << ")" << std::endl;
+      return;
+    }
+
+    status =
+        loadZeExtensionFunction(driver, "zeCommandListIsGraphCaptureEnabledExp",
+                                pfnIsGraphCaptureEnabled);
+
+    if (status != ZE_RESULT_SUCCESS || pfnIsGraphCaptureEnabled == nullptr) {
+      std::cerr << "Warning: zeCommandListIsGraphCaptureEnabledExp extension "
+                   "not available (status="
+                << status << ")" << std::endl;
+    }
+  }
+
+  /// Implementation using index sequence for parameter pack expansion
+  template <size_t... Is, typename... States>
+  void verifyImpl(std::index_sequence<Is...>, States... expected_states) {
+    (checkCommandList(Is, commandLists[Is], expected_states), ...);
+  }
+
+  /// Check a single command list's state
+  void checkCommandList(size_t index, ze_command_list_handle_t cmdList,
+                        exp_ext::queue_state expected) {
+    exp_ext::queue_state actual = getCommandListState(cmdList);
+
+    if (actual != expected) {
+      std::cerr << "CommandList " << index << " L0 state mismatch: expected "
+                << stateToString(expected) << " but got "
+                << stateToString(actual) << std::endl;
+      assert(false);
+    }
+  }
+
+  /// Query Level Zero extension API directly for command list capture state
+  exp_ext::queue_state
+  getCommandListState(ze_command_list_handle_t cmdList) const {
+    if (pfnIsGraphCaptureEnabled == nullptr) {
+      // Extension not available, assume executing state
+      return exp_ext::queue_state::executing;
+    }
+
+    ze_result_t captureStatus = pfnIsGraphCaptureEnabled(cmdList);
+
+    // Per Level Zero graph extension spec:
+    // ZE_RESULT_QUERY_TRUE means recording is enabled
+    // ZE_RESULT_QUERY_FALSE means recording is not enabled
+    if (captureStatus == ZE_RESULT_QUERY_TRUE) {
+      return exp_ext::queue_state::recording;
+    } else {
+      return exp_ext::queue_state::executing;
+    }
+  }
+
+  static const char *stateToString(exp_ext::queue_state state) {
+    return state == exp_ext::queue_state::recording ? "recording" : "executing";
+  }
+};
+
+template <typename... CommandLists>
+CommandListStateVerifier(CommandLists...)
+    -> CommandListStateVerifier<sizeof...(CommandLists)>;

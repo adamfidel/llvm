@@ -23,7 +23,6 @@ int main() {
   int *Data = malloc_device<int>(N, Queue);
 
   QueueStateVerifier verifier(Queue);
-
   verifier.verify(EXECUTING);
 
   // Record graph with two kernels: add 3, then subtract 1

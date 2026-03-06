@@ -157,7 +157,7 @@ public:
   template <typename... CommandLists>
   CommandListStateVerifier(CommandLists... cmdLists)
       : commandLists{cmdLists...} {
-    loadGraphDumpExtension();
+    loadGraphIsCapturingExtension();
   }
 
   template <typename... States> void verify(States... expected_states) {
@@ -165,7 +165,7 @@ public:
   }
 
 private:
-  void loadGraphDumpExtension() {
+  void loadGraphIsCapturingExtension() {
     ze_driver_handle_t driver;
     ASSERT_ZE_RESULT_SUCCESS(getDriver(driver));
     ASSERT_ZE_RESULT_SUCCESS(

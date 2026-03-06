@@ -456,7 +456,6 @@ class QueueStateVerifier {
   std::array<queue, N> queues;
 
 public:
-  /// Constructor: stores references to queues
   template <typename... Queues>
   QueueStateVerifier(Queues... qs) : queues{qs...} {}
 

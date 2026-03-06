@@ -22,6 +22,7 @@
 #include <sycl/device.hpp>                                  // for device
 #include <sycl/event.hpp>                                   // for event
 #include <sycl/ext/oneapi/backend/level_zero_ownership.hpp> // for ownership
+#include <sycl/ext/oneapi/experimental/graph.hpp>           // for command_graph
 #include <sycl/image.hpp>                                   // for image
 #include <sycl/kernel.hpp>                                  // for kernel
 #include <sycl/kernel_bundle_enums.hpp>                     // for bundle_state
@@ -158,6 +159,32 @@ inline auto get_native<backend::ext_oneapi_level_zero, queue>(const queue &Obj)
              : backend_return_t<backend::ext_oneapi_level_zero, queue>{
                    reinterpret_cast<ze_command_queue_handle_t>(Handle)};
 }
+
+// Specialization of sycl::get_native for modifiable command graph.
+template <>
+__SYCL_EXPORT auto
+get_native<backend::ext_oneapi_level_zero,
+           ext::oneapi::experimental::command_graph<
+               ext::oneapi::experimental::graph_state::modifiable>>(
+    const ext::oneapi::experimental::command_graph<
+        ext::oneapi::experimental::graph_state::modifiable> &Obj)
+    -> backend_return_t<
+        backend::ext_oneapi_level_zero,
+        ext::oneapi::experimental::command_graph<
+            ext::oneapi::experimental::graph_state::modifiable>>;
+
+// Specialization of sycl::get_native for executable command graph.
+template <>
+__SYCL_EXPORT auto
+get_native<backend::ext_oneapi_level_zero,
+           ext::oneapi::experimental::command_graph<
+               ext::oneapi::experimental::graph_state::executable>>(
+    const ext::oneapi::experimental::command_graph<
+        ext::oneapi::experimental::graph_state::executable> &Obj)
+    -> backend_return_t<
+        backend::ext_oneapi_level_zero,
+        ext::oneapi::experimental::command_graph<
+            ext::oneapi::experimental::graph_state::executable>>;
 
 // Specialization of sycl::make_event for Level-Zero backend.
 template <>

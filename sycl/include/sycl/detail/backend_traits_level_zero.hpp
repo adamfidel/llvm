@@ -41,6 +41,8 @@ typedef struct _ze_event_handle_t *ze_event_handle_t;
 typedef struct _ze_image_handle_t *ze_image_handle_t;
 typedef struct _ze_kernel_handle_t *ze_kernel_handle_t;
 typedef struct _ze_module_handle_t *ze_module_handle_t;
+typedef struct _ze_graph_handle_t *ze_graph_handle_t;
+typedef struct _ze_executable_graph_handle_t *ze_executable_graph_handle_t;
 
 namespace sycl {
 inline namespace _V1 {
@@ -211,7 +213,14 @@ template <> struct BackendReturn<backend::ext_oneapi_level_zero, kernel> {
 using graph = ext::oneapi::experimental::command_graph<
     ext::oneapi::experimental::graph_state::executable>;
 template <> struct BackendReturn<backend::ext_oneapi_level_zero, graph> {
-  using type = ze_command_list_handle_t;
+  using type = ze_executable_graph_handle_t;
+};
+
+using modifiable_graph = ext::oneapi::experimental::command_graph<
+    ext::oneapi::experimental::graph_state::modifiable>;
+template <>
+struct BackendReturn<backend::ext_oneapi_level_zero, modifiable_graph> {
+  using type = ze_graph_handle_t;
 };
 
 template <> struct InteropFeatureSupportMap<backend::ext_oneapi_level_zero> {

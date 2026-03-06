@@ -451,7 +451,8 @@ private:
 };
 
 // Verify recording states of one or more queues
-template <size_t N> class QueueStateVerifier {
+template <size_t N>
+class QueueStateVerifier {
   std::array<queue, N> queues;
 
 public:

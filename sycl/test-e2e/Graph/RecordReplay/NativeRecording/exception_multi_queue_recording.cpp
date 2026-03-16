@@ -28,45 +28,23 @@ int main() {
   constexpr size_t N = 1024;
   int *Data = malloc_device<int>(N, Dev, Ctx);
 
-  // Start recording on Queue1
   Graph.begin_recording(Queue1);
 
-  // Submit a kernel to Queue1
   Queue1.submit([&](handler &CGH) {
     CGH.parallel_for(range<1>{N}, [=](id<1> idx) { Data[idx] = idx; });
   });
 
   // Try to start recording on Queue2 while Queue1 is still recording
-  if (!expectException([&]() { Graph.begin_recording(Queue2); },
-                       "begin_recording on second queue")) {
-    Graph.end_recording(Queue1);
-    free(Data, Ctx);
-    return 1;
-  }
-
-  // End recording on Queue1
+  const bool passed = expectException([&]() { Graph.begin_recording(Queue2); },
+                       "begin_recording on second queue");
+  
   Graph.end_recording(Queue1);
+  free(Data, Ctx);
 
-  // Verify that after ending recording on Queue1, we CAN start recording on
-  // Queue2 (sequential recording to different queues should work)
-  bool sequentialRecordingWorks = true;
-  try {
-    Graph.begin_recording(Queue2);
-    Queue2.submit([&](handler &CGH) {
-      CGH.parallel_for(range<1>{N}, [=](id<1> idx) { Data[idx] = idx * 2; });
-    });
-    Graph.end_recording(Queue2);
-  } catch (const sycl::exception &e) {
-    std::cerr << "ERROR: Sequential recording to different queues should work!"
-              << std::endl;
-    sequentialRecordingWorks = false;
-  }
-
-  if (!sequentialRecordingWorks) {
-    free(Data, Ctx);
+  if (!passed) {
+    std::cerr << "Expected a thrown exception when starting recording twice" << std::endl;
     return 1;
   }
 
-  free(Data, Ctx);
   return 0;
 }

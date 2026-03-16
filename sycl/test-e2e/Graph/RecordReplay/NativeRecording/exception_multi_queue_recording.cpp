@@ -37,6 +37,9 @@ int main() {
   // Try to start recording on Queue2 while Queue1 is still recording
   const bool passed = expectException([&]() { Graph.begin_recording(Queue2); },
                        "begin_recording on second queue");
+
+  assert(Queue1.ext_oneapi_get_state() == exp_ext::queue_state::recording);
+  assert(Queue2.ext_oneapi_get_state() == exp_ext::queue_state::executing);
   
   Graph.end_recording(Queue1);
   free(Data, Ctx);

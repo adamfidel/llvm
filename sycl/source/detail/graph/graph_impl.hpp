@@ -314,7 +314,7 @@ public:
 
   /// Prints the contents of the graph to a text file in DOT format.
   /// @param FilePath Path to the output file.
-  /// @param Verbose If true and the non-native recording path is used, print
+  /// @param Verbose If true (and native recording is not enabled), print
   /// additional information about the nodes such as kernel args or memory
   /// access where applicable.
   void printGraphAsDot(const std::string FilePath, bool Verbose) const {

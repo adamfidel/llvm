@@ -69,6 +69,12 @@ typedef ze_result_t(ZE_APICALL *zeCommandListAppendHostFunction_fn)(
 typedef ze_result_t(ZE_APICALL *zeCommandListIsGraphCaptureEnabledExp_fn)(
     ze_command_list_handle_t);
 
+typedef ze_result_t(ZE_APICALL *zeGraphIsEmptyExp_fn)(ze_graph_handle_t);
+
+typedef ze_result_t(ZE_APICALL *zeCommandListAppendGraphExp_fn)(
+    ze_command_list_handle_t, ze_executable_graph_handle_t, void *,
+    ze_event_handle_t, uint32_t, ze_event_handle_t *);
+
 template <typename FunctionPtr>
 inline ze_result_t loadZeExtensionFunction(ze_driver_handle_t ZeDriver,
                                            const char *FunctionName,

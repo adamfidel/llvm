@@ -42,7 +42,6 @@
 #include <sycl/detail/backend_traits_hip.hpp>
 #endif
 #if SYCL_EXT_ONEAPI_BACKEND_LEVEL_ZERO
-#include <detail/graph/graph_impl.hpp>               // for graph_impl
 #include <sycl/detail/backend_traits_level_zero.hpp> // for _ze_command_lis...
 #include <sycl/ext/oneapi/experimental/graph.hpp>    // for command_graph
 #endif
@@ -243,77 +242,32 @@ get_native<backend::ext_oneapi_hip, context>(const context &Obj) {
 #endif // SYCL_EXT_ONEAPI_BACKEND_HIP
 
 #if SYCL_EXT_ONEAPI_BACKEND_LEVEL_ZERO
+
 // Specialization of sycl::get_native for modifiable command graph.
+// Defined in level_zero.cpp
 template <>
-inline backend_return_t<backend::ext_oneapi_level_zero,
-                        ext::oneapi::experimental::command_graph<
-                            ext::oneapi::experimental::graph_state::modifiable>>
-get_native<backend::ext_oneapi_level_zero,
-           ext::oneapi::experimental::command_graph<
-               ext::oneapi::experimental::graph_state::modifiable>>(
-    const ext::oneapi::experimental::command_graph<
-        ext::oneapi::experimental::graph_state::modifiable> &Obj) {
-  // Cast to detail base class to access impl
-  auto &DetailGraph = static_cast<
-      const ext::oneapi::experimental::detail::modifiable_command_graph &>(Obj);
-  // Use getSyclObjImpl to access impl through friend mechanism (ABI-safe)
-  auto GraphImpl = sycl::detail::getSyclObjImpl(DetailGraph);
-
-  // Get the native UR graph handle
-  ur_exp_graph_handle_t URHandle = GraphImpl->getNativeGraphHandle();
-
-  // Check if native recording is enabled
-  if (URHandle == nullptr) {
-    throw sycl::exception(
-        make_error_code(errc::feature_not_supported),
-        "get_native() is only supported for graphs created with native "
-        "recording enabled. Set SYCL_GRAPH_ENABLE_NATIVE_RECORDING=1 and use "
-        "immediate command lists.");
-  }
-
-  // TODO: Use urGraphGetNativeHandleExp when it's added to UR API.
-  // For now, cast UR handle to native Level Zero graph handle.
-  // This works because in L0 v2 adapter, the UR handle wraps the L0 handle,
-  // but this is implementation-dependent and fragile.
-  return reinterpret_cast<ze_graph_handle_t>(URHandle);
-}
+__SYCL_EXPORT
+    backend_return_t<backend::ext_oneapi_level_zero,
+                     ext::oneapi::experimental::command_graph<
+                         ext::oneapi::experimental::graph_state::modifiable>>
+    get_native<backend::ext_oneapi_level_zero,
+               ext::oneapi::experimental::command_graph<
+                   ext::oneapi::experimental::graph_state::modifiable>>(
+        const ext::oneapi::experimental::command_graph<
+            ext::oneapi::experimental::graph_state::modifiable> &Obj);
 
 // Specialization of sycl::get_native for executable command graph.
+// Defined in level_zero.cpp
 template <>
-inline backend_return_t<backend::ext_oneapi_level_zero,
-                        ext::oneapi::experimental::command_graph<
-                            ext::oneapi::experimental::graph_state::executable>>
-get_native<backend::ext_oneapi_level_zero,
-           ext::oneapi::experimental::command_graph<
-               ext::oneapi::experimental::graph_state::executable>>(
-    const ext::oneapi::experimental::command_graph<
-        ext::oneapi::experimental::graph_state::executable> &Obj) {
-  // Cast to detail base class to access impl
-  auto &DetailGraph = static_cast<
-      const ext::oneapi::experimental::detail::executable_command_graph &>(Obj);
-  // Use getSyclObjImpl to access impl through friend mechanism (ABI-safe)
-  auto ExecGraphImpl = sycl::detail::getSyclObjImpl(DetailGraph);
-
-  // Get the native UR executable graph handle
-  ur_exp_executable_graph_handle_t URHandle =
-      ExecGraphImpl->getNativeExecutableGraphHandle();
-
-  // Check if native recording was enabled
-  if (URHandle == nullptr) {
-    throw sycl::exception(
-        make_error_code(errc::feature_not_supported),
-        "get_native() is only supported for executable graphs created from "
-        "graphs with native recording enabled. Set "
-        "SYCL_GRAPH_ENABLE_NATIVE_RECORDING=1 and use immediate command "
-        "lists.");
-  }
-
-  // TODO: Use urExecutableGraphGetNativeHandleExp when it's added to UR API.
-  // For now, cast UR handle to native Level Zero executable graph handle.
-  // This works because in L0 v2 adapter, the UR handle wraps the L0 handle,
-  // but this is implementation-dependent and fragile.
-  return reinterpret_cast<ze_executable_graph_handle_t>(URHandle);
-}
+__SYCL_EXPORT
+    backend_return_t<backend::ext_oneapi_level_zero,
+                     ext::oneapi::experimental::command_graph<
+                         ext::oneapi::experimental::graph_state::executable>>
+    get_native<backend::ext_oneapi_level_zero,
+               ext::oneapi::experimental::command_graph<
+                   ext::oneapi::experimental::graph_state::executable>>(
+        const ext::oneapi::experimental::command_graph<
+            ext::oneapi::experimental::graph_state::executable> &Obj);
 
 #endif // SYCL_EXT_ONEAPI_BACKEND_LEVEL_ZERO
 

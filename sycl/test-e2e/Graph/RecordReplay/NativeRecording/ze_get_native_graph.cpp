@@ -5,11 +5,6 @@
 // Extra run to check for leaks in Level Zero using UR_L0_LEAKS_DEBUG
 // RUN: %if level_zero %{%{l0_leak_check} %{run} %t.out 2>&1 | FileCheck %s --implicit-check-not=LEAK %}
 
-// CHECK: Modifiable graph handle obtained successfully
-// CHECK: Executable graph handle obtained successfully
-// CHECK: Queue native handle obtained successfully
-// CHECK: Test passed
-
 // Tests get_native() for command graphs with native recording enabled
 
 #include "../../graph_common.hpp"

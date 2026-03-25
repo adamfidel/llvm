@@ -276,6 +276,27 @@ struct {
 
 ``` C++
 ext::oneapi::experimental::command_graph<
+    ext::oneapi::experimental::graph_state::modifiable>
+```
+
+See [sycl_ext_oneapi_graph](../experimental/sycl_ext_oneapi_graph.asciidoc)
+
+</td>
+
+<td>
+
+``` C++
+ze_graph_handle_t
+```
+</td>
+<td></td>
+</tr>
+
+<tr>
+<td>
+
+``` C++
+ext::oneapi::experimental::command_graph<
     ext::oneapi::experimental::graph_state::executable>
 ```
 
@@ -286,7 +307,7 @@ See [sycl_ext_oneapi_graph](../experimental/sycl_ext_oneapi_graph.asciidoc)
 <td>
 
 ``` C++
-ze_command_list_handle_t
+ze_executable_graph_handle_t
 ```
 </td>
 <td></td>
@@ -304,9 +325,11 @@ auto get_native(const SyclObjectT &Obj)
     -> backend_return_t<BackendName, SyclObjectT>
 ```
 It is currently supported for SYCL ```platform```, ```device```, ```context```, ```queue```, ```event```,
-```kernel_bundle```, and ```kernel``` classes. 
+```kernel_bundle```, ```kernel```, and ```command_graph``` classes.
 
 The ```get_native(queue)``` function returns either ```ze_command_queue_handle_t``` or ```ze_command_list_handle_t``` depending on the manner in which the input argument ```queue``` had been created. Queues created with the SYCL ```queue``` constructors have a default setting for whether they use command queues or command lists. The default and how it may be changed is documented in the description for the environment variable ```SYCL_PI_LEVEL_ZERO_USE_IMMEDIATE_COMMANDLISTS```. Queues created using ```make_queue()``` use either a command list or command queue depending on the input argument to ```make_queue``` and are not affected by the default for SYCL queues or the environment variable.
+
+The ```get_native(command_graph<modifiable>)``` and ```get_native(command_graph<executable>)``` functions are only supported for graphs created with native recording enabled (via the ```property::graph::enable_native_recording``` property). If called on a graph created without native recording, these functions throw a ```sycl::exception``` with error code ```errc::feature_not_supported```. When native recording is enabled, ```get_native(command_graph<modifiable>)``` returns ```ze_graph_handle_t``` and ```get_native(command_graph<executable>)``` returns ```ze_executable_graph_handle_t```, which correspond to the Level Zero experimental graph extension handles.
 
 The ```sycl::get_native<backend::ext_oneapi_level_zero>```
 free-function is not supported for SYCL ```buffer``` or ```image``` class. The native backend object associated with the

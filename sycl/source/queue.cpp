@@ -82,9 +82,7 @@ ext::oneapi::experimental::queue_state queue::ext_oneapi_get_state() const {
 ext::oneapi::experimental::command_graph<
     ext::oneapi::experimental::graph_state::modifiable>
 queue::ext_oneapi_get_graph() const {
-  // Try non-native recording path first (queue stores graph directly)
   auto Graph = impl->getCommandGraph();
-
   if (!Graph) {
     // Native recording path: queue doesn't store graph, need registry lookup
     // Query UR for the graph handle being captured by this queue
@@ -102,9 +100,7 @@ queue::ext_oneapi_get_graph() const {
           "ext_oneapi_get_graph() can only be called on recording queues.");
     }
 
-    // Look up the SYCL graph from the context registry
     Graph = impl->getContextImpl().getNativeGraph(UrGraphHandle);
-
     if (!Graph) {
       throw sycl::exception(
           make_error_code(errc::invalid),

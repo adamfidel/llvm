@@ -253,7 +253,6 @@ public:
                           const usm::alloc &Kind);
 
   /// Register a native UR graph handle with its SYCL graph implementation.
-  /// Used for native recording mode to support ext_oneapi_get_graph().
   /// @param UrGraphHandle The native UR graph handle to register
   /// @param Graph The SYCL graph implementation to associate with the handle
   void registerNativeGraph(
@@ -262,7 +261,6 @@ public:
           Graph);
 
   /// Lookup a SYCL graph implementation from a native UR graph handle.
-  /// Used by queue::ext_oneapi_get_graph() to retrieve the graph being
   /// recorded to.
   /// @param UrGraphHandle The native UR graph handle to look up
   /// @return Shared pointer to graph_impl if found, nullptr otherwise
@@ -270,7 +268,6 @@ public:
   getNativeGraph(ur_exp_graph_handle_t UrGraphHandle) const;
 
   /// Deregister a native UR graph handle.
-  /// Called during graph destruction to remove the handle from the registry.
   /// @param UrGraphHandle The native UR graph handle to deregister
   void deregisterNativeGraph(ur_exp_graph_handle_t UrGraphHandle);
 
@@ -353,9 +350,10 @@ private:
       MDeviceGlobalUnregisteredData;
   std::mutex MDeviceGlobalUnregisteredDataMutex;
 
-  // Native graph registry for ext_oneapi_get_graph() support with native
-  // recording. Maps UR graph handles to their SYCL graph implementations.
-  // Uses weak_ptr to avoid circular dependencies and extending graph lifetimes.
+  // Native graph registry mapping UR handles to their originating SYCL graph
+  // object. Enables command_graph lookup in cases where direct backend
+  // submissions (e.g. L0) bypass SYCL and cause a queue to transition to
+  // recording without our knowledge.
   std::unordered_map<
       ur_exp_graph_handle_t,
       std::weak_ptr<sycl::ext::oneapi::experimental::detail::graph_impl>>

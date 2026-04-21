@@ -1,5 +1,9 @@
 // REQUIRES: level_zero_v2_adapter && arch-intel_gpu_bmg_g21
+// REQUIRES: linux
 // REQUIRES-INTEL-DRIVER: lin 38146
+
+// TODO: The windows minimum driver version is currently unclear. This should be
+// updated in the future.
 
 // RUN: %{build} -o %t.out
 // RUN: %{run} %t.out

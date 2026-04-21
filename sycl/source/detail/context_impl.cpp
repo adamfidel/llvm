@@ -253,28 +253,24 @@ void context_impl::registerNativeGraph(
     ur_exp_graph_handle_t UrGraphHandle,
     std::shared_ptr<sycl::ext::oneapi::experimental::detail::graph_impl>
         Graph) {
-  if (!UrGraphHandle) {
-    return; // Graph doesn't use native recording
-  }
+  assert(UrGraphHandle != nullptr);
   std::lock_guard<std::mutex> Lock(MNativeGraphRegistryMutex);
-  // Use try_emplace to handle multiple begin/end recording cycles
   MNativeGraphRegistry.try_emplace(UrGraphHandle, Graph);
 }
 
 std::shared_ptr<sycl::ext::oneapi::experimental::detail::graph_impl>
 context_impl::getNativeGraph(ur_exp_graph_handle_t UrGraphHandle) const {
+  assert(UrGraphHandle != nullptr);
   std::lock_guard<std::mutex> Lock(MNativeGraphRegistryMutex);
   auto It = MNativeGraphRegistry.find(UrGraphHandle);
   if (It != MNativeGraphRegistry.end()) {
-    return It->second.lock(); // Returns nullptr if graph destroyed
+    return It->second.lock();
   }
   return nullptr;
 }
 
 void context_impl::deregisterNativeGraph(ur_exp_graph_handle_t UrGraphHandle) {
-  if (!UrGraphHandle) {
-    return; // Graph doesn't use native recording
-  }
+  assert(UrGraphHandle != nullptr);
   std::lock_guard<std::mutex> Lock(MNativeGraphRegistryMutex);
   MNativeGraphRegistry.erase(UrGraphHandle);
 }

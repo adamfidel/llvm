@@ -360,6 +360,13 @@ graph_impl::graph_impl(const sycl::context &SyclContext,
   }
 }
 
+void graph_impl::registerNativeGraphInContext() {
+  if (MNativeGraphHandle) {
+    context_impl &ContextImpl = *sycl::detail::getSyclObjImpl(MContext);
+    ContextImpl.registerNativeGraph(MNativeGraphHandle, shared_from_this());
+  }
+}
+
 graph_impl::~graph_impl() {
   try {
     clearQueues(false /*Needs lock*/);
@@ -847,7 +854,6 @@ void graph_impl::beginRecordingImpl(sycl::detail::queue_impl &Queue,
         throw sycl::exception(sycl::make_error_code(errc::runtime),
                               "Failed to begin native UR graph capture");
       }
-      ContextImpl.registerNativeGraph(MNativeGraphHandle, shared_from_this());
     } else {
       // Non-native recording path
       if (AcquireQueueLock) {
@@ -2098,18 +2104,30 @@ modifiable_command_graph::modifiable_command_graph(
     const sycl::context &SyclContext, const sycl::device &SyclDevice,
     const sycl::property_list &PropList)
     : impl(std::make_shared<detail::graph_impl>(SyclContext, SyclDevice,
-                                                PropList)) {}
+                                                PropList)) {
+  if (impl->getNativeGraphHandle()) {
+    impl->registerNativeGraphInContext();
+  }
+}
 
 modifiable_command_graph::modifiable_command_graph(
     const sycl::queue &SyclQueue, const sycl::property_list &PropList)
     : impl(std::make_shared<detail::graph_impl>(
-          SyclQueue.get_context(), SyclQueue.get_device(), PropList)) {}
+          SyclQueue.get_context(), SyclQueue.get_device(), PropList)) {
+  if (impl->getNativeGraphHandle()) {
+    impl->registerNativeGraphInContext();
+  }
+}
 
 modifiable_command_graph::modifiable_command_graph(
     const sycl::device &SyclDevice, const sycl::property_list &PropList)
     : impl(std::make_shared<detail::graph_impl>(
           SyclDevice.get_platform().khr_get_default_context(), SyclDevice,
-          PropList)) {}
+          PropList)) {
+  if (impl->getNativeGraphHandle()) {
+    impl->registerNativeGraphInContext();
+  }
+}
 
 node modifiable_command_graph::addImpl(dynamic_command_group &DynCGF,
                                        const std::vector<node> &Deps) {

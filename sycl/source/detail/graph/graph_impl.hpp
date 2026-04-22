@@ -545,6 +545,11 @@ public:
     return MNativeGraphHandle;
   }
 
+  /// Register the native graph handle with the context if native recording
+  /// is enabled. This allows allows queues to look-up a graph_impl from a
+  /// UR graph handle via the context.
+  void registerNativeGraphInContext();
+
   /// Check if a queue is currently recording to this graph.
   /// @param Queue The queue to check.
   /// @return True if the queue is recording to this graph, false otherwise.

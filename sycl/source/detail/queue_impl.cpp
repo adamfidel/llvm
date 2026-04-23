@@ -568,7 +568,7 @@ queue_impl::ext_oneapi_get_graph_impl() const {
     if (!Graph) {
       throw sycl::exception(
           make_error_code(errc::invalid),
-          "Failed to find SYCL graph for native recording queue");
+          "ext_oneapi_get_graph() can only be called on recording queues.");
     }
   }
   return Graph;

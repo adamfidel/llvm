@@ -361,10 +361,9 @@ graph_impl::graph_impl(const sycl::context &SyclContext,
 }
 
 void graph_impl::registerNativeGraphInContext() {
-  if (MNativeGraphHandle) {
-    context_impl &ContextImpl = *sycl::detail::getSyclObjImpl(MContext);
-    ContextImpl.registerNativeGraph(MNativeGraphHandle, shared_from_this());
-  }
+  assert(MNativeGraphHandle != nullptr);
+  context_impl &ContextImpl = *sycl::detail::getSyclObjImpl(MContext);
+  ContextImpl.registerNativeGraph(MNativeGraphHandle, shared_from_this());
 }
 
 graph_impl::~graph_impl() {

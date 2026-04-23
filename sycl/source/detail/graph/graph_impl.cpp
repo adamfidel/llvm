@@ -360,12 +360,6 @@ graph_impl::graph_impl(const sycl::context &SyclContext,
   }
 }
 
-void graph_impl::registerNativeGraphInContext() {
-  assert(MNativeGraphHandle != nullptr);
-  context_impl &ContextImpl = *sycl::detail::getSyclObjImpl(MContext);
-  ContextImpl.registerNativeGraph(MNativeGraphHandle, shared_from_this());
-}
-
 graph_impl::~graph_impl() {
   try {
     clearQueues(false /*Needs lock*/);
@@ -2104,8 +2098,9 @@ modifiable_command_graph::modifiable_command_graph(
     const sycl::property_list &PropList)
     : impl(std::make_shared<detail::graph_impl>(SyclContext, SyclDevice,
                                                 PropList)) {
-  if (impl->getNativeGraphHandle()) {
-    impl->registerNativeGraphInContext();
+  if (auto UrNativeHandle = impl->getNativeGraphHandle()) {
+    auto &ContextImpl = *sycl::detail::getSyclObjImpl(SyclContext);
+    ContextImpl.registerNativeGraph(UrNativeHandle, impl);
   }
 }
 
@@ -2113,8 +2108,9 @@ modifiable_command_graph::modifiable_command_graph(
     const sycl::queue &SyclQueue, const sycl::property_list &PropList)
     : impl(std::make_shared<detail::graph_impl>(
           SyclQueue.get_context(), SyclQueue.get_device(), PropList)) {
-  if (impl->getNativeGraphHandle()) {
-    impl->registerNativeGraphInContext();
+  if (auto UrNativeHandle = impl->getNativeGraphHandle()) {
+    auto &ContextImpl = *sycl::detail::getSyclObjImpl(SyclQueue.get_context());
+    ContextImpl.registerNativeGraph(UrNativeHandle, impl);
   }
 }
 
@@ -2123,8 +2119,9 @@ modifiable_command_graph::modifiable_command_graph(
     : impl(std::make_shared<detail::graph_impl>(
           SyclDevice.get_platform().khr_get_default_context(), SyclDevice,
           PropList)) {
-  if (impl->getNativeGraphHandle()) {
-    impl->registerNativeGraphInContext();
+  if (auto UrNativeHandle = impl->getNativeGraphHandle()) {
+    auto &ContextImpl = *sycl::detail::getSyclObjImpl(impl->getContext());
+    ContextImpl.registerNativeGraph(UrNativeHandle, impl);
   }
 }
 

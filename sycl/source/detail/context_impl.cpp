@@ -9,7 +9,6 @@
 #include <detail/context_impl.hpp>
 #include <detail/context_info.hpp>
 #include <detail/event_info.hpp>
-#include <detail/graph/graph_impl.hpp>
 #include <detail/memory_pool_impl.hpp>
 #include <detail/platform_impl.hpp>
 #include <detail/queue_impl.hpp>
@@ -253,7 +252,7 @@ void context_impl::registerNativeGraph(
     ur_exp_graph_handle_t UrGraphHandle,
     std::shared_ptr<sycl::ext::oneapi::experimental::detail::graph_impl>
         Graph) {
-  assert(UrGraphHandle != nullptr);
+  assert(UrGraphHandle != nullptr && Graph != nullptr);
   std::lock_guard<std::mutex> Lock(MNativeGraphRegistryMutex);
   MNativeGraphRegistry.try_emplace(UrGraphHandle, Graph);
 }

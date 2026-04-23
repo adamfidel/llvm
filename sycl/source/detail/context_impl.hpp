@@ -261,7 +261,6 @@ public:
           Graph);
 
   /// Lookup a SYCL graph implementation from a native UR graph handle.
-  /// recorded to.
   /// @param UrGraphHandle The native UR graph handle to look up
   /// @return Shared pointer to graph_impl if found, nullptr otherwise
   std::shared_ptr<sycl::ext::oneapi::experimental::detail::graph_impl>

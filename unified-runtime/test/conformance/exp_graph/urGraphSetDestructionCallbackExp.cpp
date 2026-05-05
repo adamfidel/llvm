@@ -30,40 +30,31 @@ UUR_DEVICE_TEST_SUITE_WITH_QUEUE_TYPES(
 
 TEST_P(urGraphSetDestructionCallbackExpTest, SuccessFreeMemory) {
   int *data = static_cast<int *>(malloc(sizeof(int)));
-  ASSERT_NE(data, nullptr);
   *data = 42;
 
-  ASSERT_SUCCESS(urGraphSetDestructionCallbackExp(
-      graph, [](void *pUserData) { free(pUserData); }, data));
+  ur_exp_graph_destruction_callback_t callback = +[](void *pUserData) {
+    free(pUserData);
+    pUserData = nullptr;
+  };
+  ASSERT_SUCCESS(urGraphSetDestructionCallbackExp(graph, callback, data));
 
+  ASSERT_NE(data, nullptr);
+  ASSERT_EQ(*data, 42);
   ASSERT_SUCCESS(urGraphDestroyExp(graph));
   graph = nullptr;
-}
-
-TEST_P(urGraphSetDestructionCallbackExpTest, SuccessSetsFlag) {
-  bool callbackInvoked = false;
-
-  ASSERT_SUCCESS(urGraphSetDestructionCallbackExp(
-      graph, [](void *pUserData) { *static_cast<bool *>(pUserData) = true; },
-      &callbackInvoked));
-
-  ASSERT_FALSE(callbackInvoked);
-  ASSERT_SUCCESS(urGraphDestroyExp(graph));
-  graph = nullptr;
-  ASSERT_TRUE(callbackInvoked);
+  ASSERT_EQ(data, nullptr);
 }
 
 TEST_P(urGraphSetDestructionCallbackExpTest, SuccessMultipleCallbacks) {
   bool firstInvoked = false;
   bool secondInvoked = false;
 
-  ASSERT_SUCCESS(urGraphSetDestructionCallbackExp(
-      graph, [](void *pUserData) { *static_cast<bool *>(pUserData) = true; },
-      &firstInvoked));
-
-  ASSERT_SUCCESS(urGraphSetDestructionCallbackExp(
-      graph, [](void *pUserData) { *static_cast<bool *>(pUserData) = true; },
-      &secondInvoked));
+  ur_exp_graph_destruction_callback_t callback =
+      +[](void *pUserData) { *static_cast<bool *>(pUserData) = true; };
+  ASSERT_SUCCESS(
+      urGraphSetDestructionCallbackExp(graph, callback, &firstInvoked));
+  ASSERT_SUCCESS(
+      urGraphSetDestructionCallbackExp(graph, callback, &secondInvoked));
 
   ASSERT_FALSE(firstInvoked);
   ASSERT_FALSE(secondInvoked);

@@ -133,17 +133,13 @@ ur_result_t urGraphSetDestructionCallbackExp(
     ur_exp_graph_handle_t hGraph,
     ur_exp_graph_destruction_callback_t pfnCallback, void *pUserData) {
   ur_context_handle_t hContext = hGraph->getContext();
-  if (!checkGraphExtensionSupport(hContext)) {
-    return UR_RESULT_ERROR_UNSUPPORTED_FEATURE;
-  }
-
-  auto zeSetCallback =
+  auto ZeSetCallback =
       hContext->getPlatform()->ZeGraphExt.zeGraphSetDestructionCallbackExp;
-  if (!zeSetCallback) {
+  if (!checkGraphExtensionSupport(hContext) || !ZeSetCallback) {
     return UR_RESULT_ERROR_UNSUPPORTED_FEATURE;
   }
 
-  ZE2UR_CALL(zeSetCallback,
+  ZE2UR_CALL(ZeSetCallback,
              (hGraph->getZeHandle(),
               reinterpret_cast<zex_mem_graph_free_callback_fn_t>(pfnCallback),
               pUserData, nullptr));

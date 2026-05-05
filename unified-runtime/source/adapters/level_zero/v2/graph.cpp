@@ -129,6 +129,28 @@ ur_result_t urGraphIsEmptyExp(ur_exp_graph_handle_t hGraph, bool *pIsEmpty) {
   return UR_RESULT_SUCCESS;
 }
 
+ur_result_t urGraphSetDestructionCallbackExp(
+    ur_exp_graph_handle_t hGraph,
+    ur_exp_graph_destruction_callback_t pfnCallback, void *pUserData) {
+  ur_context_handle_t hContext = hGraph->getContext();
+  if (!checkGraphExtensionSupport(hContext)) {
+    return UR_RESULT_ERROR_UNSUPPORTED_FEATURE;
+  }
+
+  auto zeSetCallback =
+      hContext->getPlatform()->ZeGraphExt.zeGraphSetDestructionCallbackExp;
+  if (!zeSetCallback) {
+    return UR_RESULT_ERROR_UNSUPPORTED_FEATURE;
+  }
+
+  ZE2UR_CALL(zeSetCallback,
+             (hGraph->getZeHandle(),
+              reinterpret_cast<zex_mem_graph_free_callback_fn_t>(pfnCallback),
+              pUserData, nullptr));
+
+  return UR_RESULT_SUCCESS;
+}
+
 ur_result_t urGraphDumpContentsExp(ur_exp_graph_handle_t hGraph,
                                    const char *filePath) {
   ur_context_handle_t hContext = hGraph->getContext();

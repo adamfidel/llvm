@@ -33,10 +33,12 @@ TEST_P(urGraphSetDestructionCallbackExpTest, SuccessFreeMemory) {
   *data = 42;
 
   ur_exp_graph_destruction_callback_t callback = +[](void *pUserData) {
-    free(pUserData);
-    pUserData = nullptr;
+    void **pCastedData = static_cast<void **>(pUserData);
+    free(*pCastedData);
+    *pCastedData = nullptr;
   };
-  ASSERT_SUCCESS(urGraphSetDestructionCallbackExp(graph, callback, data));
+  ASSERT_SUCCESS(urGraphSetDestructionCallbackExp(graph, callback,
+                                                  static_cast<void *>(&data)));
 
   ASSERT_NE(data, nullptr);
   ASSERT_EQ(*data, 42);

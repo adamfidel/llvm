@@ -28,6 +28,7 @@ struct ur_exp_graph_handle_t_;
 using ur_exp_graph_handle_t = ur_exp_graph_handle_t_ *;
 struct ur_exp_executable_graph_handle_t_;
 using ur_exp_executable_graph_handle_t = ur_exp_executable_graph_handle_t_ *;
+using ur_exp_graph_destruction_callback_t = void (*)(void *);
 
 // For testing of graph internals
 class GraphImplTest;
@@ -550,6 +551,24 @@ public:
   /// @return True if the queue is recording to this graph, false otherwise.
   bool isQueueRecording(sycl::detail::queue_impl &Queue);
 
+  /// Register a destruction callback via the native UR graph (native recording
+  /// path).
+  /// @param pfnCallback Callback function to invoke on graph destruction.
+  /// @param CleanupOnFailure Called with pUserData to free it if registration
+  /// fails.
+  /// @param pUserData User data pointer passed to the callback.
+  void
+  setNativeDestructionCallback(ur_exp_graph_destruction_callback_t pfnCallback,
+                               void (*CleanupOnFailure)(void *),
+                               void *pUserData);
+
+  /// Register a destruction callback stored locally (command buffer path).
+  /// The callback will be invoked in ~graph_impl().
+  /// @param pfnCallback Callback function to invoke on graph destruction.
+  /// @param pUserData User data pointer passed to the callback.
+  void setCommandBufferDestructionCallback(
+      ur_exp_graph_destruction_callback_t pfnCallback, void *pUserData);
+
 private:
   /// Common implementation for beginRecording and beginRecordingUnlockedQueue.
   /// @param[in] Queue The queue to be recorded from.
@@ -644,6 +663,10 @@ private:
   // The number of live executable graphs that have been created from this
   // modifiable graph
   std::atomic<size_t> MExecGraphCount = 0;
+
+  /// Destruction callbacks registered for the command buffer path.
+  /// Invoked in ~graph_impl() when native recording is not enabled.
+  std::vector<std::function<void()>> MDestructionCallbacks;
 };
 
 /// Get whether native recording is enabled for this graph.

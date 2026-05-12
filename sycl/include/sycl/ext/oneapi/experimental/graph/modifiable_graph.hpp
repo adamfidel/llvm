@@ -17,6 +17,7 @@
 
 #include <functional> // for function
 #include <memory>     // for shared_ptr
+#include <tuple>      // for tuple
 #include <vector>     // for vector
 
 namespace sycl {
@@ -162,6 +163,24 @@ public:
   /// Returns true if the graph contains no nodes.
   bool empty() const;
 
+  /// Register a callback to be invoked when the graph object is destroyed.
+  /// @param Callback Callable to invoke on destruction.
+  /// @param CbArgs Arguments to forward to the callback.
+  template <typename Func, typename... ArgTs>
+  void set_destruction_callback(Func &&Callback, ArgTs &&...CbArgs) {
+    using TupleT = std::tuple<std::decay_t<Func>, std::decay_t<ArgTs>...>;
+    auto Data = std::make_unique<TupleT>(std::forward<Func>(Callback),
+                                         std::forward<ArgTs>(CbArgs)...);
+    auto Trampoline = [](void *UserData) {
+      std::unique_ptr<TupleT> Tup(static_cast<TupleT *>(UserData));
+      std::apply([](auto &Fn, auto &...As) { Fn(As...); }, *Tup);
+    };
+    auto CleanupOnFailure = [](void *UserData) {
+      std::unique_ptr<TupleT>{static_cast<TupleT *>(UserData)};
+    };
+    setDestructionCallbackImpl(Trampoline, CleanupOnFailure, Data.release());
+  }
+
   /// Common Reference Semantics
   friend bool operator==(const modifiable_command_graph &LHS,
                          const modifiable_command_graph &RHS) {
@@ -202,6 +221,10 @@ protected:
   void addGraphLeafDependencies(node Node);
 
   void print_graph(sycl::detail::string_view path, bool verbose = false) const;
+
+  void setDestructionCallbackImpl(void (*Callback)(void *),
+                                  void (*CleanupOnFailure)(void *),
+                                  void *UserData);
 
   std::shared_ptr<detail::graph_impl> impl;
 

@@ -362,6 +362,11 @@ graph_impl::graph_impl(const sycl::context &SyclContext,
 
 graph_impl::~graph_impl() {
   try {
+    for (auto &Cb : MDestructionCallbacks) {
+      Cb();
+    }
+    MDestructionCallbacks.clear();
+
     clearQueues(false /*Needs lock*/);
     for (auto &MemObj : MMemObjs) {
       MemObj->markNoLongerBeingUsedInGraph();
@@ -644,6 +649,27 @@ void graph_impl::removeQueue(sycl::detail::queue_impl &RecordingQueue) {
 bool graph_impl::isQueueRecording(sycl::detail::queue_impl &Queue) {
 
   return MRecordingQueues.count(Queue.weak_from_this()) > 0;
+}
+
+void graph_impl::setNativeDestructionCallback(
+    ur_exp_graph_destruction_callback_t pfnCallback,
+    void (*CleanupOnFailure)(void *), void *pUserData) {
+  context_impl &ContextImpl = *sycl::detail::getSyclObjImpl(MContext);
+  sycl::detail::adapter_impl &Adapter = ContextImpl.getAdapter();
+  ur_result_t Result = Adapter.call_nocheck<
+      sycl::detail::UrApiKind::urGraphSetDestructionCallbackExp>(
+      MNativeGraphHandle, pfnCallback, pUserData);
+  if (Result != UR_RESULT_SUCCESS) {
+    CleanupOnFailure(pUserData);
+    throw sycl::exception(sycl::make_error_code(errc::runtime),
+                          "Failed to register graph destruction callback");
+  }
+}
+
+void graph_impl::setCommandBufferDestructionCallback(
+    ur_exp_graph_destruction_callback_t pfnCallback, void *pUserData) {
+  MDestructionCallbacks.push_back(
+      [pfnCallback, pUserData]() { pfnCallback(pUserData); });
 }
 
 void graph_impl::clearQueues(bool NeedsLock) {
@@ -2354,6 +2380,16 @@ void modifiable_command_graph::checkNodePropertiesAndThrow(
   };
   sycl::detail::PropertyValidator::checkPropsAndThrow(
       Properties, CheckDataLessProperties, CheckPropertiesWithData);
+}
+
+void modifiable_command_graph::setDestructionCallbackImpl(
+    void (*Callback)(void *), void (*CleanupOnFailure)(void *),
+    void *UserData) {
+  if (impl->getNativeGraphHandle()) {
+    impl->setNativeDestructionCallback(Callback, CleanupOnFailure, UserData);
+  } else {
+    impl->setCommandBufferDestructionCallback(Callback, UserData);
+  }
 }
 
 executable_command_graph::executable_command_graph(

@@ -666,10 +666,8 @@ void graph_impl::setNativeDestructionCallback(
   }
 }
 
-void graph_impl::setCommandBufferDestructionCallback(
-    ur_exp_graph_destruction_callback_t pfnCallback, void *pUserData) {
-  MDestructionCallbacks.push_back(
-      [pfnCallback, pUserData]() { pfnCallback(pUserData); });
+void graph_impl::addDestructionCallback(std::function<void()> Callback) {
+  MDestructionCallbacks.push_back(std::move(Callback));
 }
 
 void graph_impl::clearQueues(bool NeedsLock) {
@@ -2383,12 +2381,21 @@ void modifiable_command_graph::checkNodePropertiesAndThrow(
 }
 
 void modifiable_command_graph::setDestructionCallbackImpl(
-    void (*Callback)(void *), void (*CleanupOnFailure)(void *),
-    void *UserData) {
+    std::function<void()> Callback) {
   if (impl->getNativeGraphHandle()) {
-    impl->setNativeDestructionCallback(Callback, CleanupOnFailure, UserData);
+    auto *Data = new std::function<void()>(std::move(Callback));
+    impl->setNativeDestructionCallback(
+        [](void *UserData) {
+          auto *Fn = static_cast<std::function<void()> *>(UserData);
+          (*Fn)();
+          delete Fn;
+        },
+        [](void *UserData) {
+          delete static_cast<std::function<void()> *>(UserData);
+        },
+        Data);
   } else {
-    impl->setCommandBufferDestructionCallback(Callback, UserData);
+    impl->addDestructionCallback(std::move(Callback));
   }
 }
 

@@ -564,10 +564,8 @@ public:
 
   /// Register a destruction callback stored locally (command buffer path).
   /// The callback will be invoked in ~graph_impl().
-  /// @param pfnCallback Callback function to invoke on graph destruction.
-  /// @param pUserData User data pointer passed to the callback.
-  void setCommandBufferDestructionCallback(
-      ur_exp_graph_destruction_callback_t pfnCallback, void *pUserData);
+  /// @param Callback Callable to invoke on graph destruction.
+  void addDestructionCallback(std::function<void()> Callback);
 
 private:
   /// Common implementation for beginRecording and beginRecordingUnlockedQueue.

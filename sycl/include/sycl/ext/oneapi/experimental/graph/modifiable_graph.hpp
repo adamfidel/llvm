@@ -17,7 +17,7 @@
 
 #include <functional> // for function
 #include <memory>     // for shared_ptr
-#include <tuple>      // for tuple
+#include <tuple>      // for tuple, apply
 #include <vector>     // for vector
 
 namespace sycl {
@@ -168,17 +168,11 @@ public:
   /// @param CbArgs Arguments to forward to the callback.
   template <typename Func, typename... ArgTs>
   void set_destruction_callback(Func &&Callback, ArgTs &&...CbArgs) {
-    using TupleT = std::tuple<std::decay_t<Func>, std::decay_t<ArgTs>...>;
-    auto Data = std::make_unique<TupleT>(std::forward<Func>(Callback),
-                                         std::forward<ArgTs>(CbArgs)...);
-    auto Trampoline = [](void *UserData) {
-      std::unique_ptr<TupleT> Tup(static_cast<TupleT *>(UserData));
-      std::apply([](auto &Fn, auto &...As) { Fn(As...); }, *Tup);
-    };
-    auto CleanupOnFailure = [](void *UserData) {
-      std::unique_ptr<TupleT>{static_cast<TupleT *>(UserData)};
-    };
-    setDestructionCallbackImpl(Trampoline, CleanupOnFailure, Data.release());
+    setDestructionCallbackImpl(
+        [Cb = std::forward<Func>(Callback),
+         Args = std::tuple(std::forward<ArgTs>(CbArgs)...)]() mutable {
+          std::apply(Cb, Args);
+        });
   }
 
   /// Common Reference Semantics
@@ -222,9 +216,7 @@ protected:
 
   void print_graph(sycl::detail::string_view path, bool verbose = false) const;
 
-  void setDestructionCallbackImpl(void (*Callback)(void *),
-                                  void (*CleanupOnFailure)(void *),
-                                  void *UserData);
+  void setDestructionCallbackImpl(std::function<void()> Callback);
 
   std::shared_ptr<detail::graph_impl> impl;
 

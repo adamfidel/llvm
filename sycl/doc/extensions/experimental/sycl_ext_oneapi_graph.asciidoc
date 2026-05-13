@@ -1556,6 +1556,7 @@ Multiple callbacks may be registered on the same graph and all will be invoked
 on destruction, in an unspecified order.
 
 The following restrictions apply to the callback and callback arguments:
+
 * `Func` must be _Callable_ with parameter types matching `ArgTs...`.
 * `std::decay_t<Func>` must be _CopyConstructible_ and _MoveConstructible_.
 * Each type in `std::decay_t<ArgTs>...` must be _CopyConstructible_ and

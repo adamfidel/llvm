@@ -651,23 +651,28 @@ bool graph_impl::isQueueRecording(sycl::detail::queue_impl &Queue) {
   return MRecordingQueues.count(Queue.weak_from_this()) > 0;
 }
 
-void graph_impl::setNativeDestructionCallback(
-    ur_exp_graph_destruction_callback_t pfnCallback,
-    void (*CleanupOnFailure)(void *), void *pUserData) {
-  context_impl &ContextImpl = *sycl::detail::getSyclObjImpl(MContext);
-  sycl::detail::adapter_impl &Adapter = ContextImpl.getAdapter();
-  ur_result_t Result = Adapter.call_nocheck<
-      sycl::detail::UrApiKind::urGraphSetDestructionCallbackExp>(
-      MNativeGraphHandle, pfnCallback, pUserData);
-  if (Result != UR_RESULT_SUCCESS) {
-    CleanupOnFailure(pUserData);
-    throw sycl::exception(sycl::make_error_code(errc::runtime),
-                          "Failed to register graph destruction callback");
+void graph_impl::setDestructionCallback(std::function<void()> Callback) {
+  if (MNativeGraphHandle) {
+    auto Data = std::make_unique<std::function<void()>>(std::move(Callback));
+    context_impl &ContextImpl = *sycl::detail::getSyclObjImpl(MContext);
+    sycl::detail::adapter_impl &Adapter = ContextImpl.getAdapter();
+    ur_result_t Result = Adapter.call_nocheck<
+        sycl::detail::UrApiKind::urGraphSetDestructionCallbackExp>(
+        MNativeGraphHandle,
+        [](void *UserData) {
+          auto *Fn = static_cast<std::function<void()> *>(UserData);
+          (*Fn)();
+          delete Fn;
+        },
+        Data.get());
+    if (Result != UR_RESULT_SUCCESS) {
+      throw sycl::exception(sycl::make_error_code(errc::runtime),
+                            "Failed to register graph destruction callback");
+    }
+    Data.release();
+  } else {
+    MDestructionCallbacks.push_back(std::move(Callback));
   }
-}
-
-void graph_impl::addDestructionCallback(std::function<void()> Callback) {
-  MDestructionCallbacks.push_back(std::move(Callback));
 }
 
 void graph_impl::clearQueues(bool NeedsLock) {
@@ -2382,21 +2387,7 @@ void modifiable_command_graph::checkNodePropertiesAndThrow(
 
 void modifiable_command_graph::setDestructionCallbackImpl(
     std::function<void()> Callback) {
-  if (impl->getNativeGraphHandle()) {
-    auto *Data = new std::function<void()>(std::move(Callback));
-    impl->setNativeDestructionCallback(
-        [](void *UserData) {
-          auto *Fn = static_cast<std::function<void()> *>(UserData);
-          (*Fn)();
-          delete Fn;
-        },
-        [](void *UserData) {
-          delete static_cast<std::function<void()> *>(UserData);
-        },
-        Data);
-  } else {
-    impl->addDestructionCallback(std::move(Callback));
-  }
+  impl->setDestructionCallback(std::move(Callback));
 }
 
 executable_command_graph::executable_command_graph(

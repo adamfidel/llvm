@@ -551,21 +551,11 @@ public:
   /// @return True if the queue is recording to this graph, false otherwise.
   bool isQueueRecording(sycl::detail::queue_impl &Queue);
 
-  /// Register a destruction callback via the native UR graph (native recording
-  /// path).
-  /// @param pfnCallback Callback function to invoke on graph destruction.
-  /// @param CleanupOnFailure Called with pUserData to free it if registration
-  /// fails.
-  /// @param pUserData User data pointer passed to the callback.
-  void
-  setNativeDestructionCallback(ur_exp_graph_destruction_callback_t pfnCallback,
-                               void (*CleanupOnFailure)(void *),
-                               void *pUserData);
-
-  /// Register a destruction callback stored locally (command buffer path).
-  /// The callback will be invoked in ~graph_impl().
+  /// Register a destruction callback to be invoked when the graph is destroyed.
+  /// Uses the native UR callback if a native graph handle exists, otherwise
+  /// stores locally for invocation in ~graph_impl().
   /// @param Callback Callable to invoke on graph destruction.
-  void addDestructionCallback(std::function<void()> Callback);
+  void setDestructionCallback(std::function<void()> Callback);
 
 private:
   /// Common implementation for beginRecording and beginRecordingUnlockedQueue.

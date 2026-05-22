@@ -4973,6 +4973,119 @@ __urdlllocal ur_result_t UR_APICALL urUsmP2PPeerAccessGetInfoExp(
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+/// @brief Intercept function for urEnqueueHostTaskExp
+__urdlllocal ur_result_t UR_APICALL urEnqueueHostTaskExp(
+    /// [in] handle of the queue object
+    ur_queue_handle_t hQueue,
+    /// [in] Host task callback function. Must not call any UR functions.
+    ur_exp_host_task_function_t pfnHostTask,
+    /// [in][optional] data used by pfnHostTask
+    void *data,
+    /// [in][optional] pointer to the host task properties
+    const ur_exp_host_task_properties_t *pProperties,
+    /// [in] size of the event wait list
+    uint32_t numEventsInWaitList,
+    /// [in][optional][range(0, numEventsInWaitList)] pointer to a list of
+    /// events that must be complete before the kernel execution.
+    /// If nullptr, the numEventsInWaitList must be 0, indicating no wait
+    /// events.
+    const ur_event_handle_t *phEventWaitList,
+    /// [out][optional][alloc] return an event object that identifies the work
+    /// that has
+    /// been enqueued in nativeEnqueueFunc. If phEventWaitList and phEvent are
+    /// not NULL, phEvent must not refer to an element of the phEventWaitList
+    /// array.
+    ur_event_handle_t *phEvent) {
+
+  auto *dditable = *reinterpret_cast<ur_dditable_t **>(hQueue);
+
+  auto *pfnHostTaskExp = dditable->EnqueueExp.pfnHostTaskExp;
+  if (nullptr == pfnHostTaskExp)
+    return UR_RESULT_ERROR_UNINITIALIZED;
+
+  // forward to device-platform
+  return pfnHostTaskExp(hQueue, pfnHostTask, data, pProperties,
+                        numEventsInWaitList, phEventWaitList, phEvent);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+/// @brief Intercept function for urEnqueueEventsWaitWithBarrierExt
+__urdlllocal ur_result_t UR_APICALL urEnqueueEventsWaitWithBarrierExt(
+    /// [in] handle of the queue object
+    ur_queue_handle_t hQueue,
+    /// [in][optional] pointer to the extended enqueue properties
+    const ur_exp_enqueue_ext_properties_t *pProperties,
+    /// [in] size of the event wait list
+    uint32_t numEventsInWaitList,
+    /// [in][optional][range(0, numEventsInWaitList)] pointer to a list of
+    /// events that must be complete before this command can be executed.
+    /// If nullptr, the numEventsInWaitList must be 0, indicating that all
+    /// previously enqueued commands
+    /// must be complete.
+    const ur_event_handle_t *phEventWaitList,
+    /// [out][optional][alloc] return an event object that identifies this
+    /// particular command instance. If phEventWaitList and phEvent are not
+    /// NULL, phEvent must not refer to an element of the phEventWaitList array.
+    ur_event_handle_t *phEvent) {
+
+  auto *dditable = *reinterpret_cast<ur_dditable_t **>(hQueue);
+
+  auto *pfnEventsWaitWithBarrierExt =
+      dditable->Enqueue.pfnEventsWaitWithBarrierExt;
+  if (nullptr == pfnEventsWaitWithBarrierExt)
+    return UR_RESULT_ERROR_UNINITIALIZED;
+
+  // forward to device-platform
+  return pfnEventsWaitWithBarrierExt(hQueue, pProperties, numEventsInWaitList,
+                                     phEventWaitList, phEvent);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+/// @brief Intercept function for urEnqueueNativeCommandExp
+__urdlllocal ur_result_t UR_APICALL urEnqueueNativeCommandExp(
+    /// [in] handle of the queue object
+    ur_queue_handle_t hQueue,
+    /// [in] function calling the native underlying API, to be executed
+    /// immediately.
+    ur_exp_enqueue_native_command_function_t pfnNativeEnqueue,
+    /// [in][optional] data used by pfnNativeEnqueue
+    void *data,
+    /// [in] size of the mem list
+    uint32_t numMemsInMemList,
+    /// [in][optional][range(0, numMemsInMemList)] mems that are used within
+    /// pfnNativeEnqueue using ::urMemGetNativeHandle.
+    /// If nullptr, the numMemsInMemList must be 0, indicating that no mems
+    /// are accessed with ::urMemGetNativeHandle within pfnNativeEnqueue.
+    const ur_mem_handle_t *phMemList,
+    /// [in][optional] pointer to the native enqueue properties
+    const ur_exp_enqueue_native_command_properties_t *pProperties,
+    /// [in] size of the event wait list
+    uint32_t numEventsInWaitList,
+    /// [in][optional][range(0, numEventsInWaitList)] pointer to a list of
+    /// events that must be complete before the kernel execution.
+    /// If nullptr, the numEventsInWaitList must be 0, indicating no wait
+    /// events.
+    const ur_event_handle_t *phEventWaitList,
+    /// [out][optional][alloc] return an event object that identifies the work
+    /// that has
+    /// been enqueued in nativeEnqueueFunc. If phEventWaitList and phEvent are
+    /// not NULL, phEvent must not refer to an element of the phEventWaitList
+    /// array.
+    ur_event_handle_t *phEvent) {
+
+  auto *dditable = *reinterpret_cast<ur_dditable_t **>(hQueue);
+
+  auto *pfnNativeCommandExp = dditable->EnqueueExp.pfnNativeCommandExp;
+  if (nullptr == pfnNativeCommandExp)
+    return UR_RESULT_ERROR_UNINITIALIZED;
+
+  // forward to device-platform
+  return pfnNativeCommandExp(hQueue, pfnNativeEnqueue, data, numMemsInMemList,
+                             phMemList, pProperties, numEventsInWaitList,
+                             phEventWaitList, phEvent);
+}
+
+///////////////////////////////////////////////////////////////////////////////
 /// @brief Intercept function for urCommandBufferCreateExp
 __urdlllocal ur_result_t UR_APICALL urCommandBufferCreateExp(
     /// [in] Handle of the context object.
@@ -5762,6 +5875,51 @@ __urdlllocal ur_result_t UR_APICALL urCommandBufferAppendNativeCommandExp(
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+/// @brief Intercept function for urCommandBufferAppendHostTaskExp
+__urdlllocal ur_result_t UR_APICALL urCommandBufferAppendHostTaskExp(
+    /// [in] Handle of the command-buffer object.
+    ur_exp_command_buffer_handle_t hCommandBuffer,
+    /// [in] Host task callback function. Must not call any UR functions.
+    ur_exp_host_task_function_t pfnHostTask,
+    /// [in][optional] data used by pfnHostTask
+    void *pData,
+    /// [in][optional] pointer to the host task properties
+    const ur_exp_host_task_properties_t *pProperties,
+    /// [in] The number of sync points in the provided dependency list.
+    uint32_t numSyncPointsInWaitList,
+    /// [in][optional] A list of sync points that this command depends on.
+    /// Will be ignored if command-buffer is in-order.
+    const ur_exp_command_buffer_sync_point_t *pSyncPointWaitList,
+    /// [in] Size of the event wait list.
+    uint32_t numEventsInWaitList,
+    /// [in][optional][range(0, numEventsInWaitList)] pointer to a list of
+    /// events that must be complete before the command execution. If nullptr,
+    /// the numEventsInWaitList must be 0, indicating no wait events.
+    const ur_event_handle_t *phEventWaitList,
+    /// [out][optional] Sync point associated with this command.
+    ur_exp_command_buffer_sync_point_t *pSyncPoint,
+    /// [out][optional][alloc] return an event object that will be signaled by
+    /// the completion of this command in the next execution of the
+    /// command-buffer.
+    ur_event_handle_t *phEvent,
+    /// [out][optional][alloc] Handle to this command. Only available if the
+    /// command-buffer is updatable.
+    ur_exp_command_buffer_command_handle_t *phCommand) {
+
+  auto *dditable = *reinterpret_cast<ur_dditable_t **>(hCommandBuffer);
+
+  auto *pfnAppendHostTaskExp = dditable->CommandBufferExp.pfnAppendHostTaskExp;
+  if (nullptr == pfnAppendHostTaskExp)
+    return UR_RESULT_ERROR_UNINITIALIZED;
+
+  // forward to device-platform
+  return pfnAppendHostTaskExp(hCommandBuffer, pfnHostTask, pData, pProperties,
+                              numSyncPointsInWaitList, pSyncPointWaitList,
+                              numEventsInWaitList, phEventWaitList, pSyncPoint,
+                              phEvent, phCommand);
+}
+
+///////////////////////////////////////////////////////////////////////////////
 /// @brief Intercept function for urEnqueueCommandBufferExp
 __urdlllocal ur_result_t UR_APICALL urEnqueueCommandBufferExp(
     /// [in] The queue to submit this command-buffer for execution.
@@ -5901,119 +6059,6 @@ __urdlllocal ur_result_t UR_APICALL urCommandBufferGetNativeHandleExp(
 
   // forward to device-platform
   return pfnGetNativeHandleExp(hCommandBuffer, phNativeCommandBuffer);
-}
-
-///////////////////////////////////////////////////////////////////////////////
-/// @brief Intercept function for urEnqueueHostTaskExp
-__urdlllocal ur_result_t UR_APICALL urEnqueueHostTaskExp(
-    /// [in] handle of the queue object
-    ur_queue_handle_t hQueue,
-    /// [in] Host task callback function. Must not call any UR functions.
-    ur_exp_host_task_function_t pfnHostTask,
-    /// [in][optional] data used by pfnHostTask
-    void *data,
-    /// [in][optional] pointer to the host task properties
-    const ur_exp_host_task_properties_t *pProperties,
-    /// [in] size of the event wait list
-    uint32_t numEventsInWaitList,
-    /// [in][optional][range(0, numEventsInWaitList)] pointer to a list of
-    /// events that must be complete before the kernel execution.
-    /// If nullptr, the numEventsInWaitList must be 0, indicating no wait
-    /// events.
-    const ur_event_handle_t *phEventWaitList,
-    /// [out][optional][alloc] return an event object that identifies the work
-    /// that has
-    /// been enqueued in nativeEnqueueFunc. If phEventWaitList and phEvent are
-    /// not NULL, phEvent must not refer to an element of the phEventWaitList
-    /// array.
-    ur_event_handle_t *phEvent) {
-
-  auto *dditable = *reinterpret_cast<ur_dditable_t **>(hQueue);
-
-  auto *pfnHostTaskExp = dditable->EnqueueExp.pfnHostTaskExp;
-  if (nullptr == pfnHostTaskExp)
-    return UR_RESULT_ERROR_UNINITIALIZED;
-
-  // forward to device-platform
-  return pfnHostTaskExp(hQueue, pfnHostTask, data, pProperties,
-                        numEventsInWaitList, phEventWaitList, phEvent);
-}
-
-///////////////////////////////////////////////////////////////////////////////
-/// @brief Intercept function for urEnqueueEventsWaitWithBarrierExt
-__urdlllocal ur_result_t UR_APICALL urEnqueueEventsWaitWithBarrierExt(
-    /// [in] handle of the queue object
-    ur_queue_handle_t hQueue,
-    /// [in][optional] pointer to the extended enqueue properties
-    const ur_exp_enqueue_ext_properties_t *pProperties,
-    /// [in] size of the event wait list
-    uint32_t numEventsInWaitList,
-    /// [in][optional][range(0, numEventsInWaitList)] pointer to a list of
-    /// events that must be complete before this command can be executed.
-    /// If nullptr, the numEventsInWaitList must be 0, indicating that all
-    /// previously enqueued commands
-    /// must be complete.
-    const ur_event_handle_t *phEventWaitList,
-    /// [out][optional][alloc] return an event object that identifies this
-    /// particular command instance. If phEventWaitList and phEvent are not
-    /// NULL, phEvent must not refer to an element of the phEventWaitList array.
-    ur_event_handle_t *phEvent) {
-
-  auto *dditable = *reinterpret_cast<ur_dditable_t **>(hQueue);
-
-  auto *pfnEventsWaitWithBarrierExt =
-      dditable->Enqueue.pfnEventsWaitWithBarrierExt;
-  if (nullptr == pfnEventsWaitWithBarrierExt)
-    return UR_RESULT_ERROR_UNINITIALIZED;
-
-  // forward to device-platform
-  return pfnEventsWaitWithBarrierExt(hQueue, pProperties, numEventsInWaitList,
-                                     phEventWaitList, phEvent);
-}
-
-///////////////////////////////////////////////////////////////////////////////
-/// @brief Intercept function for urEnqueueNativeCommandExp
-__urdlllocal ur_result_t UR_APICALL urEnqueueNativeCommandExp(
-    /// [in] handle of the queue object
-    ur_queue_handle_t hQueue,
-    /// [in] function calling the native underlying API, to be executed
-    /// immediately.
-    ur_exp_enqueue_native_command_function_t pfnNativeEnqueue,
-    /// [in][optional] data used by pfnNativeEnqueue
-    void *data,
-    /// [in] size of the mem list
-    uint32_t numMemsInMemList,
-    /// [in][optional][range(0, numMemsInMemList)] mems that are used within
-    /// pfnNativeEnqueue using ::urMemGetNativeHandle.
-    /// If nullptr, the numMemsInMemList must be 0, indicating that no mems
-    /// are accessed with ::urMemGetNativeHandle within pfnNativeEnqueue.
-    const ur_mem_handle_t *phMemList,
-    /// [in][optional] pointer to the native enqueue properties
-    const ur_exp_enqueue_native_command_properties_t *pProperties,
-    /// [in] size of the event wait list
-    uint32_t numEventsInWaitList,
-    /// [in][optional][range(0, numEventsInWaitList)] pointer to a list of
-    /// events that must be complete before the kernel execution.
-    /// If nullptr, the numEventsInWaitList must be 0, indicating no wait
-    /// events.
-    const ur_event_handle_t *phEventWaitList,
-    /// [out][optional][alloc] return an event object that identifies the work
-    /// that has
-    /// been enqueued in nativeEnqueueFunc. If phEventWaitList and phEvent are
-    /// not NULL, phEvent must not refer to an element of the phEventWaitList
-    /// array.
-    ur_event_handle_t *phEvent) {
-
-  auto *dditable = *reinterpret_cast<ur_dditable_t **>(hQueue);
-
-  auto *pfnNativeCommandExp = dditable->EnqueueExp.pfnNativeCommandExp;
-  if (nullptr == pfnNativeCommandExp)
-    return UR_RESULT_ERROR_UNINITIALIZED;
-
-  // forward to device-platform
-  return pfnNativeCommandExp(hQueue, pfnNativeEnqueue, data, numMemsInMemList,
-                             phMemList, pProperties, numEventsInWaitList,
-                             phEventWaitList, phEvent);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -6482,6 +6527,8 @@ UR_DLLEXPORT ur_result_t UR_APICALL urGetCommandBufferExpProcAddrTable(
           ur_loader::urCommandBufferAppendUSMAdviseExp;
       pDdiTable->pfnAppendNativeCommandExp =
           ur_loader::urCommandBufferAppendNativeCommandExp;
+      pDdiTable->pfnAppendHostTaskExp =
+          ur_loader::urCommandBufferAppendHostTaskExp;
       pDdiTable->pfnUpdateKernelLaunchExp =
           ur_loader::urCommandBufferUpdateKernelLaunchExp;
       pDdiTable->pfnUpdateSignalEventExp =
@@ -6693,9 +6740,9 @@ UR_DLLEXPORT ur_result_t UR_APICALL urGetEnqueueExpProcAddrTable(
       pDdiTable->pfnUSMFreeExp = ur_loader::urEnqueueUSMFreeExp;
       pDdiTable->pfnTimestampRecordingExp =
           ur_loader::urEnqueueTimestampRecordingExp;
-      pDdiTable->pfnCommandBufferExp = ur_loader::urEnqueueCommandBufferExp;
       pDdiTable->pfnHostTaskExp = ur_loader::urEnqueueHostTaskExp;
       pDdiTable->pfnNativeCommandExp = ur_loader::urEnqueueNativeCommandExp;
+      pDdiTable->pfnCommandBufferExp = ur_loader::urEnqueueCommandBufferExp;
       pDdiTable->pfnGraphExp = ur_loader::urEnqueueGraphExp;
     } else {
       // return pointers directly to platform's DDIs

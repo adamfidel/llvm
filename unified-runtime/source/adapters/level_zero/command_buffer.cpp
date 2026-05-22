@@ -1995,6 +1995,15 @@ ur_result_t urCommandBufferAppendNativeCommandExp(
   return UR_RESULT_SUCCESS;
 }
 
+ur_result_t urCommandBufferAppendHostTaskExp(
+    ur_exp_command_buffer_handle_t, ur_exp_host_task_function_t, void *,
+    const ur_exp_host_task_properties_t *, uint32_t,
+    const ur_exp_command_buffer_sync_point_t *, uint32_t,
+    const ur_event_handle_t *, ur_exp_command_buffer_sync_point_t *,
+    ur_event_handle_t *, ur_exp_command_buffer_command_handle_t *) {
+  return UR_RESULT_ERROR_UNSUPPORTED_FEATURE;
+}
+
 ur_result_t
 urCommandBufferGetNativeHandleExp(ur_exp_command_buffer_handle_t hCommandBuffer,
                                   ur_native_handle_t *phNativeCommandBuffer) {

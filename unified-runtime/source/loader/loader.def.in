@@ -30,6 +30,7 @@ EXPORTS
 	urBindlessImagesUnsampledImageCreateExp
 	urBindlessImagesUnsampledImageHandleDestroyExp
 	urBindlessImagesWaitExternalSemaphoreExp
+	urCommandBufferAppendHostTaskExp
 	urCommandBufferAppendKernelLaunchExp
 	urCommandBufferAppendKernelLaunchWithArgsExp
 	urCommandBufferAppendMemBufferCopyExp
@@ -236,6 +237,7 @@ EXPORTS
 	urPrintBufferRegion
 	urPrintCodeLocation
 	urPrintCommand
+	urPrintCommandBufferAppendHostTaskExpParams
 	urPrintCommandBufferAppendKernelLaunchExpParams
 	urPrintCommandBufferAppendKernelLaunchWithArgsExpParams
 	urPrintCommandBufferAppendMemBufferCopyExpParams

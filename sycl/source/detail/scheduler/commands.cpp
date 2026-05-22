@@ -3021,6 +3021,29 @@ ur_result_t ExecCGCommand::enqueueImpCommandBuffer() {
     MEvent->setSyncPoint(OutSyncPoint);
     return UR_RESULT_SUCCESS;
   }
+  case CGType::CodeplayHostTask: {
+    CGHostTask *HostTask = (CGHostTask *)MCommandGroup.get();
+
+    // Only handlerless host tasks (from ext enqueue functions API) are
+    // supported in command buffers.
+    assert(HostTask->MHostTask->isCreatedFromEnqueueFunction() &&
+           !HostTask->MHostTask->isInteropTask() &&
+           "Only handlerless host tasks are supported in command buffers");
+
+    // Heap-allocate the host task callable so it persists until CB execution.
+    auto *HostTaskData =
+        new EnqueueHostTaskData(HostTask->MHostTask->MHostTask);
+
+    adapter_impl &Adapter = MQueue->getAdapter();
+    Adapter.call<UrApiKind::urCommandBufferAppendHostTaskExp>(
+        MCommandBuffer, NativeHostTask, HostTaskData, nullptr,
+        MSyncPointDeps.size(),
+        MSyncPointDeps.empty() ? nullptr : MSyncPointDeps.data(), 0, nullptr,
+        &OutSyncPoint, nullptr, nullptr);
+
+    MEvent->setSyncPoint(OutSyncPoint);
+    return UR_RESULT_SUCCESS;
+  }
   case CGType::EnqueueNativeCommand: {
     // Queue is created by graph_impl before creating command to submit to
     // scheduler.

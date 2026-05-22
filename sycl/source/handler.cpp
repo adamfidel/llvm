@@ -766,10 +766,17 @@ detail::EventImplPtr handler::finalize() {
 
   // Native graph recording limitation
   if (type == detail::CGType::CodeplayHostTask && Queue->isNativeRecording()) {
-    throw sycl::exception(
-        make_error_code(errc::feature_not_supported),
-        "SYCL host_task is not supported in native recording mode. Use "
-        "zeCommandListAppendHostFunction as a workaround.");
+    auto *HostTaskCG = static_cast<detail::CGHostTask *>(CommandGroup.get());
+    // Handlerless host tasks (from ext::oneapi::experimental::host_task) are
+    // supported in native recording mode because urEnqueueHostTaskExp maps to
+    // zeCommandListAppendHostFunction which is captured by the L0 driver.
+    if (!HostTaskCG->MHostTask->isCreatedFromEnqueueFunction() ||
+        HostTaskCG->MHostTask->isInteropTask()) {
+      throw sycl::exception(
+          make_error_code(errc::feature_not_supported),
+          "SYCL host_task is not supported in native recording mode. Use "
+          "zeCommandListAppendHostFunction as a workaround.");
+    }
   }
   if (!CommandGroup->getRequirements().empty() && Queue->isNativeRecording()) {
     throw sycl::exception(

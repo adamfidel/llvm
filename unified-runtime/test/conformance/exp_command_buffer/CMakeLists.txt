@@ -29,6 +29,7 @@ add_conformance_kernels_test(exp_command_buffer
   update/local_memory_update.cpp
   update/enqueue_update.cpp
   regression/usm_copy.cpp
+  host_task.cpp
 )
 
 add_subdirectory(native-command)

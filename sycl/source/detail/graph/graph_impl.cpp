@@ -14,6 +14,7 @@
 #include <detail/cg.hpp> // for CG, CGExecKernel, CGHostTask, ArgDesc, NDRDescT
 #include <detail/event_impl.hpp>                      // for event_impl
 #include <detail/handler_impl.hpp>                    // for handler_impl
+#include <detail/host_task.hpp>                       // for HostTask
 #include <detail/kernel_arg_mask.hpp>                 // for KernelArgMask
 #include <detail/kernel_impl.hpp>                     // for kernel_impl
 #include <detail/program_manager/program_manager.hpp> // ProgramManager
@@ -40,6 +41,19 @@ namespace experimental {
 namespace detail {
 
 namespace {
+
+/// Check if a node is a handlerless host task (from ext enqueue functions API).
+/// These host tasks can be embedded in command buffers and should not be
+/// treated as partition boundaries.
+bool isHandlerlessHostTask(node_impl &Node) {
+  if (Node.MCGType != sycl::detail::CGType::CodeplayHostTask)
+    return false;
+  auto *CGHT =
+      static_cast<sycl::detail::CGHostTask *>(Node.MCommandGroup.get());
+  return CGHT->MHostTask->isCreatedFromEnqueueFunction() &&
+         !CGHT->MHostTask->isInteropTask();
+}
+
 /// Return a string representation of a given node_type
 inline const char *nodeTypeToString(node_type NodeType) {
   switch (NodeType) {
@@ -127,7 +141,8 @@ void sortTopological(nodes_range Roots, std::list<node_impl *> &SortedNodes,
 /// @param PartitionNum Number to propagate.
 void propagatePartitionUp(node_impl &Node, int PartitionNum) {
   if (((Node.MPartitionNum != -1) && (Node.MPartitionNum <= PartitionNum)) ||
-      (Node.MCGType == sycl::detail::CGType::CodeplayHostTask)) {
+      (Node.MCGType == sycl::detail::CGType::CodeplayHostTask &&
+       !isHandlerlessHostTask(Node))) {
     return;
   }
   Node.MPartitionNum = PartitionNum;
@@ -145,7 +160,8 @@ void propagatePartitionUp(node_impl &Node, int PartitionNum) {
 /// are encountered as successors to the node Node.
 void propagatePartitionDown(node_impl &Node, int PartitionNum,
                             std::list<node_impl *> &HostTaskList) {
-  if (Node.MCGType == sycl::detail::CGType::CodeplayHostTask) {
+  if (Node.MCGType == sycl::detail::CGType::CodeplayHostTask &&
+      !isHandlerlessHostTask(Node)) {
     if (Node.MPartitionNum != -1) {
       HostTaskList.push_front(&Node);
     }
@@ -182,9 +198,11 @@ void partition::updateSchedule() {
 void exec_graph_impl::makePartitions() {
   int CurrentPartition = -1;
   std::list<node_impl *> HostTaskList;
-  // find all the host-tasks in the graph
+  // find all the host-tasks in the graph (skip handlerless host tasks which
+  // can be embedded in command buffers and don't need separate partitions)
   for (node_impl &Node : nodes()) {
-    if (Node.MCGType == sycl::detail::CGType::CodeplayHostTask) {
+    if (Node.MCGType == sycl::detail::CGType::CodeplayHostTask &&
+        !isHandlerlessHostTask(Node)) {
       HostTaskList.push_back(&Node);
     }
   }
@@ -256,7 +274,8 @@ void exec_graph_impl::makePartitions() {
         MPartitionNodes[&Node] = PartitionFinalNum;
         if (isPartitionRoot(Node)) {
           Partition->MRoots.insert(&Node);
-          if (Node.MCGType == CGType::CodeplayHostTask) {
+          if (Node.MCGType == CGType::CodeplayHostTask &&
+              !isHandlerlessHostTask(Node)) {
             Partition->MIsHostTask = true;
           }
         }

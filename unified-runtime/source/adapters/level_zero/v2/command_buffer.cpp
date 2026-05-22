@@ -772,6 +772,24 @@ ur_result_t urCommandBufferAppendNativeCommandExp(
   return UR_RESULT_SUCCESS;
 }
 
+ur_result_t urCommandBufferAppendHostTaskExp(
+    ur_exp_command_buffer_handle_t hCommandBuffer,
+    ur_exp_host_task_function_t pfnHostTask, void *pData,
+    const ur_exp_host_task_properties_t *pProperties,
+    uint32_t numSyncPointsInWaitList,
+    const ur_exp_command_buffer_sync_point_t *pSyncPointWaitList, uint32_t,
+    const ur_event_handle_t *, ur_exp_command_buffer_sync_point_t *pSyncPoint,
+    ur_event_handle_t *, ur_exp_command_buffer_command_handle_t *) {
+  auto commandListLocked = hCommandBuffer->commandListManager.lock();
+  auto eventsWaitList = hCommandBuffer->getWaitListFromSyncPoints(
+      pSyncPointWaitList, numSyncPointsInWaitList);
+  wait_list_view waitListView(eventsWaitList, numSyncPointsInWaitList);
+  UR_CALL(commandListLocked->appendHostTaskExp(
+      pfnHostTask, pData, pProperties, waitListView,
+      hCommandBuffer->createEventIfRequested(pSyncPoint)));
+  return UR_RESULT_SUCCESS;
+}
+
 ur_result_t
 urCommandBufferGetNativeHandleExp(ur_exp_command_buffer_handle_t hCommandBuffer,
                                   ur_native_handle_t *phNativeCommandBuffer) {

@@ -8076,6 +8076,161 @@ ur_result_t UR_APICALL urUsmP2PPeerAccessGetInfoExp(
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+/// @brief Enqueue host task to be executed on the queue.
+///
+/// @returns
+///     - ::UR_RESULT_SUCCESS
+///     - ::UR_RESULT_ERROR_UNINITIALIZED
+///     - ::UR_RESULT_ERROR_DEVICE_LOST
+///     - ::UR_RESULT_ERROR_ADAPTER_SPECIFIC
+///     - ::UR_RESULT_ERROR_INVALID_NULL_HANDLE
+///         + `NULL == hQueue`
+///     - ::UR_RESULT_ERROR_INVALID_NULL_POINTER
+///         + `NULL == pfnHostTask`
+///     - ::UR_RESULT_ERROR_INVALID_ENUMERATION
+///         + `NULL != pProperties && ::UR_EXP_HOST_TASK_FLAGS_MASK &
+///         pProperties->flags`
+///     - ::UR_RESULT_ERROR_INVALID_EVENT_WAIT_LIST
+///         + `phEventWaitList == NULL && numEventsInWaitList > 0`
+///         + `phEventWaitList != NULL && numEventsInWaitList == 0`
+///         + If event objects in phEventWaitList are not valid events.
+///     - ::UR_RESULT_ERROR_UNSUPPORTED_FEATURE
+///         + If `zeCommandListAppendHostFunction` Level Zero API is not
+///         supported by the driver.
+ur_result_t UR_APICALL urEnqueueHostTaskExp(
+    /// [in] handle of the queue object
+    ur_queue_handle_t hQueue,
+    /// [in] Host task callback function. Must not call any UR functions.
+    ur_exp_host_task_function_t pfnHostTask,
+    /// [in][optional] data used by pfnHostTask
+    void *data,
+    /// [in][optional] pointer to the host task properties
+    const ur_exp_host_task_properties_t *pProperties,
+    /// [in] size of the event wait list
+    uint32_t numEventsInWaitList,
+    /// [in][optional][range(0, numEventsInWaitList)] pointer to a list of
+    /// events that must be complete before the kernel execution.
+    /// If nullptr, the numEventsInWaitList must be 0, indicating no wait
+    /// events.
+    const ur_event_handle_t *phEventWaitList,
+    /// [out][optional][alloc] return an event object that identifies the work
+    /// that has
+    /// been enqueued in nativeEnqueueFunc. If phEventWaitList and phEvent are
+    /// not NULL, phEvent must not refer to an element of the phEventWaitList
+    /// array.
+    ur_event_handle_t *phEvent) {
+  ur_result_t result = UR_RESULT_SUCCESS;
+  return result;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+/// @brief Enqueue a barrier command which waits a list of events to complete
+///        before it completes, with optional extended properties
+///
+/// @details
+///     - If the event list is empty, it waits for all previously enqueued
+///       commands to complete.
+///     - It blocks command execution - any following commands enqueued after it
+///       do not execute until it completes.
+///     - It returns an event which can be waited on.
+///
+/// @remarks
+///   _Analogues_
+///     - **clEnqueueBarrierWithWaitList**
+///
+/// @returns
+///     - ::UR_RESULT_SUCCESS
+///     - ::UR_RESULT_ERROR_UNINITIALIZED
+///     - ::UR_RESULT_ERROR_DEVICE_LOST
+///     - ::UR_RESULT_ERROR_ADAPTER_SPECIFIC
+///     - ::UR_RESULT_ERROR_INVALID_NULL_HANDLE
+///         + `NULL == hQueue`
+///     - ::UR_RESULT_ERROR_INVALID_ENUMERATION
+///         + `NULL != pProperties && ::UR_EXP_ENQUEUE_EXT_FLAGS_MASK &
+///         pProperties->flags`
+///     - ::UR_RESULT_ERROR_INVALID_QUEUE
+///     - ::UR_RESULT_ERROR_INVALID_EVENT
+///     - ::UR_RESULT_ERROR_INVALID_EVENT_WAIT_LIST
+///         + `phEventWaitList == NULL && numEventsInWaitList > 0`
+///         + `phEventWaitList != NULL && numEventsInWaitList == 0`
+///         + If event objects in phEventWaitList are not valid events.
+///     - ::UR_RESULT_ERROR_IN_EVENT_LIST_EXEC_STATUS
+///         + An event in `phEventWaitList` has ::UR_EVENT_STATUS_ERROR.
+///     - ::UR_RESULT_ERROR_INVALID_VALUE
+///     - ::UR_RESULT_ERROR_OUT_OF_HOST_MEMORY
+///     - ::UR_RESULT_ERROR_OUT_OF_RESOURCES
+ur_result_t UR_APICALL urEnqueueEventsWaitWithBarrierExt(
+    /// [in] handle of the queue object
+    ur_queue_handle_t hQueue,
+    /// [in][optional] pointer to the extended enqueue properties
+    const ur_exp_enqueue_ext_properties_t *pProperties,
+    /// [in] size of the event wait list
+    uint32_t numEventsInWaitList,
+    /// [in][optional][range(0, numEventsInWaitList)] pointer to a list of
+    /// events that must be complete before this command can be executed.
+    /// If nullptr, the numEventsInWaitList must be 0, indicating that all
+    /// previously enqueued commands
+    /// must be complete.
+    const ur_event_handle_t *phEventWaitList,
+    /// [out][optional][alloc] return an event object that identifies this
+    /// particular command instance. If phEventWaitList and phEvent are not
+    /// NULL, phEvent must not refer to an element of the phEventWaitList array.
+    ur_event_handle_t *phEvent) {
+  ur_result_t result = UR_RESULT_SUCCESS;
+  return result;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+/// @brief Immediately enqueue work through a native backend API
+///
+/// @returns
+///     - ::UR_RESULT_SUCCESS
+///     - ::UR_RESULT_ERROR_UNINITIALIZED
+///     - ::UR_RESULT_ERROR_DEVICE_LOST
+///     - ::UR_RESULT_ERROR_ADAPTER_SPECIFIC
+///     - ::UR_RESULT_ERROR_INVALID_NULL_HANDLE
+///         + `NULL == hQueue`
+///     - ::UR_RESULT_ERROR_INVALID_NULL_POINTER
+///         + `NULL == pfnNativeEnqueue`
+///     - ::UR_RESULT_ERROR_INVALID_ENUMERATION
+///         + `NULL != pProperties && ::UR_EXP_ENQUEUE_NATIVE_COMMAND_FLAGS_MASK
+///         & pProperties->flags`
+///     - ::UR_RESULT_ERROR_INVALID_EVENT_WAIT_LIST
+ur_result_t UR_APICALL urEnqueueNativeCommandExp(
+    /// [in] handle of the queue object
+    ur_queue_handle_t hQueue,
+    /// [in] function calling the native underlying API, to be executed
+    /// immediately.
+    ur_exp_enqueue_native_command_function_t pfnNativeEnqueue,
+    /// [in][optional] data used by pfnNativeEnqueue
+    void *data,
+    /// [in] size of the mem list
+    uint32_t numMemsInMemList,
+    /// [in][optional][range(0, numMemsInMemList)] mems that are used within
+    /// pfnNativeEnqueue using ::urMemGetNativeHandle.
+    /// If nullptr, the numMemsInMemList must be 0, indicating that no mems
+    /// are accessed with ::urMemGetNativeHandle within pfnNativeEnqueue.
+    const ur_mem_handle_t *phMemList,
+    /// [in][optional] pointer to the native enqueue properties
+    const ur_exp_enqueue_native_command_properties_t *pProperties,
+    /// [in] size of the event wait list
+    uint32_t numEventsInWaitList,
+    /// [in][optional][range(0, numEventsInWaitList)] pointer to a list of
+    /// events that must be complete before the kernel execution.
+    /// If nullptr, the numEventsInWaitList must be 0, indicating no wait
+    /// events.
+    const ur_event_handle_t *phEventWaitList,
+    /// [out][optional][alloc] return an event object that identifies the work
+    /// that has
+    /// been enqueued in nativeEnqueueFunc. If phEventWaitList and phEvent are
+    /// not NULL, phEvent must not refer to an element of the phEventWaitList
+    /// array.
+    ur_event_handle_t *phEvent) {
+  ur_result_t result = UR_RESULT_SUCCESS;
+  return result;
+}
+
+///////////////////////////////////////////////////////////////////////////////
 /// @brief Create a Command-Buffer object
 ///
 /// @details
@@ -9175,6 +9330,65 @@ ur_result_t UR_APICALL urCommandBufferAppendNativeCommandExp(
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+/// @brief Append a host task callback to the command-buffer for deferred
+///        execution during replay.
+///
+/// @returns
+///     - ::UR_RESULT_SUCCESS
+///     - ::UR_RESULT_ERROR_UNINITIALIZED
+///     - ::UR_RESULT_ERROR_DEVICE_LOST
+///     - ::UR_RESULT_ERROR_ADAPTER_SPECIFIC
+///     - ::UR_RESULT_ERROR_INVALID_NULL_HANDLE
+///         + `NULL == hCommandBuffer`
+///     - ::UR_RESULT_ERROR_INVALID_NULL_POINTER
+///         + `NULL == pfnHostTask`
+///     - ::UR_RESULT_ERROR_INVALID_ENUMERATION
+///         + `NULL != pProperties && ::UR_EXP_HOST_TASK_FLAGS_MASK &
+///         pProperties->flags`
+///     - ::UR_RESULT_ERROR_INVALID_COMMAND_BUFFER_EXP
+///     - ::UR_RESULT_ERROR_INVALID_COMMAND_BUFFER_SYNC_POINT_EXP
+///     - ::UR_RESULT_ERROR_INVALID_COMMAND_BUFFER_SYNC_POINT_WAIT_LIST_EXP
+///         + `pSyncPointWaitList == NULL && numSyncPointsInWaitList > 0`
+///         + `pSyncPointWaitList != NULL && numSyncPointsInWaitList == 0`
+///     - ::UR_RESULT_ERROR_INVALID_EVENT_WAIT_LIST
+///         + `phEventWaitList == NULL && numEventsInWaitList > 0`
+///         + `phEventWaitList != NULL && numEventsInWaitList == 0`
+///     - ::UR_RESULT_ERROR_OUT_OF_HOST_MEMORY
+///     - ::UR_RESULT_ERROR_OUT_OF_RESOURCES
+ur_result_t UR_APICALL urCommandBufferAppendHostTaskExp(
+    /// [in] Handle of the command-buffer object.
+    ur_exp_command_buffer_handle_t hCommandBuffer,
+    /// [in] Host task callback function. Must not call any UR functions.
+    ur_exp_host_task_function_t pfnHostTask,
+    /// [in][optional] data used by pfnHostTask
+    void *pData,
+    /// [in][optional] pointer to the host task properties
+    const ur_exp_host_task_properties_t *pProperties,
+    /// [in] The number of sync points in the provided dependency list.
+    uint32_t numSyncPointsInWaitList,
+    /// [in][optional] A list of sync points that this command depends on.
+    /// Will be ignored if command-buffer is in-order.
+    const ur_exp_command_buffer_sync_point_t *pSyncPointWaitList,
+    /// [in] Size of the event wait list.
+    uint32_t numEventsInWaitList,
+    /// [in][optional][range(0, numEventsInWaitList)] pointer to a list of
+    /// events that must be complete before the command execution. If nullptr,
+    /// the numEventsInWaitList must be 0, indicating no wait events.
+    const ur_event_handle_t *phEventWaitList,
+    /// [out][optional] Sync point associated with this command.
+    ur_exp_command_buffer_sync_point_t *pSyncPoint,
+    /// [out][optional][alloc] return an event object that will be signaled by
+    /// the completion of this command in the next execution of the
+    /// command-buffer.
+    ur_event_handle_t *phEvent,
+    /// [out][optional][alloc] Handle to this command. Only available if the
+    /// command-buffer is updatable.
+    ur_exp_command_buffer_command_handle_t *phCommand) {
+  ur_result_t result = UR_RESULT_SUCCESS;
+  return result;
+}
+
+///////////////////////////////////////////////////////////////////////////////
 /// @brief Submit a command-buffer for execution on a queue.
 ///
 /// @returns
@@ -9448,161 +9662,6 @@ ur_result_t UR_APICALL urCommandBufferGetNativeHandleExp(
     ur_exp_command_buffer_handle_t hCommandBuffer,
     /// [out] A pointer to the native handle of the command-buffer.
     ur_native_handle_t *phNativeCommandBuffer) {
-  ur_result_t result = UR_RESULT_SUCCESS;
-  return result;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-/// @brief Enqueue host task to be executed on the queue.
-///
-/// @returns
-///     - ::UR_RESULT_SUCCESS
-///     - ::UR_RESULT_ERROR_UNINITIALIZED
-///     - ::UR_RESULT_ERROR_DEVICE_LOST
-///     - ::UR_RESULT_ERROR_ADAPTER_SPECIFIC
-///     - ::UR_RESULT_ERROR_INVALID_NULL_HANDLE
-///         + `NULL == hQueue`
-///     - ::UR_RESULT_ERROR_INVALID_NULL_POINTER
-///         + `NULL == pfnHostTask`
-///     - ::UR_RESULT_ERROR_INVALID_ENUMERATION
-///         + `NULL != pProperties && ::UR_EXP_HOST_TASK_FLAGS_MASK &
-///         pProperties->flags`
-///     - ::UR_RESULT_ERROR_INVALID_EVENT_WAIT_LIST
-///         + `phEventWaitList == NULL && numEventsInWaitList > 0`
-///         + `phEventWaitList != NULL && numEventsInWaitList == 0`
-///         + If event objects in phEventWaitList are not valid events.
-///     - ::UR_RESULT_ERROR_UNSUPPORTED_FEATURE
-///         + If `zeCommandListAppendHostFunction` Level Zero API is not
-///         supported by the driver.
-ur_result_t UR_APICALL urEnqueueHostTaskExp(
-    /// [in] handle of the queue object
-    ur_queue_handle_t hQueue,
-    /// [in] Host task callback function. Must not call any UR functions.
-    ur_exp_host_task_function_t pfnHostTask,
-    /// [in][optional] data used by pfnHostTask
-    void *data,
-    /// [in][optional] pointer to the host task properties
-    const ur_exp_host_task_properties_t *pProperties,
-    /// [in] size of the event wait list
-    uint32_t numEventsInWaitList,
-    /// [in][optional][range(0, numEventsInWaitList)] pointer to a list of
-    /// events that must be complete before the kernel execution.
-    /// If nullptr, the numEventsInWaitList must be 0, indicating no wait
-    /// events.
-    const ur_event_handle_t *phEventWaitList,
-    /// [out][optional][alloc] return an event object that identifies the work
-    /// that has
-    /// been enqueued in nativeEnqueueFunc. If phEventWaitList and phEvent are
-    /// not NULL, phEvent must not refer to an element of the phEventWaitList
-    /// array.
-    ur_event_handle_t *phEvent) {
-  ur_result_t result = UR_RESULT_SUCCESS;
-  return result;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-/// @brief Enqueue a barrier command which waits a list of events to complete
-///        before it completes, with optional extended properties
-///
-/// @details
-///     - If the event list is empty, it waits for all previously enqueued
-///       commands to complete.
-///     - It blocks command execution - any following commands enqueued after it
-///       do not execute until it completes.
-///     - It returns an event which can be waited on.
-///
-/// @remarks
-///   _Analogues_
-///     - **clEnqueueBarrierWithWaitList**
-///
-/// @returns
-///     - ::UR_RESULT_SUCCESS
-///     - ::UR_RESULT_ERROR_UNINITIALIZED
-///     - ::UR_RESULT_ERROR_DEVICE_LOST
-///     - ::UR_RESULT_ERROR_ADAPTER_SPECIFIC
-///     - ::UR_RESULT_ERROR_INVALID_NULL_HANDLE
-///         + `NULL == hQueue`
-///     - ::UR_RESULT_ERROR_INVALID_ENUMERATION
-///         + `NULL != pProperties && ::UR_EXP_ENQUEUE_EXT_FLAGS_MASK &
-///         pProperties->flags`
-///     - ::UR_RESULT_ERROR_INVALID_QUEUE
-///     - ::UR_RESULT_ERROR_INVALID_EVENT
-///     - ::UR_RESULT_ERROR_INVALID_EVENT_WAIT_LIST
-///         + `phEventWaitList == NULL && numEventsInWaitList > 0`
-///         + `phEventWaitList != NULL && numEventsInWaitList == 0`
-///         + If event objects in phEventWaitList are not valid events.
-///     - ::UR_RESULT_ERROR_IN_EVENT_LIST_EXEC_STATUS
-///         + An event in `phEventWaitList` has ::UR_EVENT_STATUS_ERROR.
-///     - ::UR_RESULT_ERROR_INVALID_VALUE
-///     - ::UR_RESULT_ERROR_OUT_OF_HOST_MEMORY
-///     - ::UR_RESULT_ERROR_OUT_OF_RESOURCES
-ur_result_t UR_APICALL urEnqueueEventsWaitWithBarrierExt(
-    /// [in] handle of the queue object
-    ur_queue_handle_t hQueue,
-    /// [in][optional] pointer to the extended enqueue properties
-    const ur_exp_enqueue_ext_properties_t *pProperties,
-    /// [in] size of the event wait list
-    uint32_t numEventsInWaitList,
-    /// [in][optional][range(0, numEventsInWaitList)] pointer to a list of
-    /// events that must be complete before this command can be executed.
-    /// If nullptr, the numEventsInWaitList must be 0, indicating that all
-    /// previously enqueued commands
-    /// must be complete.
-    const ur_event_handle_t *phEventWaitList,
-    /// [out][optional][alloc] return an event object that identifies this
-    /// particular command instance. If phEventWaitList and phEvent are not
-    /// NULL, phEvent must not refer to an element of the phEventWaitList array.
-    ur_event_handle_t *phEvent) {
-  ur_result_t result = UR_RESULT_SUCCESS;
-  return result;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-/// @brief Immediately enqueue work through a native backend API
-///
-/// @returns
-///     - ::UR_RESULT_SUCCESS
-///     - ::UR_RESULT_ERROR_UNINITIALIZED
-///     - ::UR_RESULT_ERROR_DEVICE_LOST
-///     - ::UR_RESULT_ERROR_ADAPTER_SPECIFIC
-///     - ::UR_RESULT_ERROR_INVALID_NULL_HANDLE
-///         + `NULL == hQueue`
-///     - ::UR_RESULT_ERROR_INVALID_NULL_POINTER
-///         + `NULL == pfnNativeEnqueue`
-///     - ::UR_RESULT_ERROR_INVALID_ENUMERATION
-///         + `NULL != pProperties && ::UR_EXP_ENQUEUE_NATIVE_COMMAND_FLAGS_MASK
-///         & pProperties->flags`
-///     - ::UR_RESULT_ERROR_INVALID_EVENT_WAIT_LIST
-ur_result_t UR_APICALL urEnqueueNativeCommandExp(
-    /// [in] handle of the queue object
-    ur_queue_handle_t hQueue,
-    /// [in] function calling the native underlying API, to be executed
-    /// immediately.
-    ur_exp_enqueue_native_command_function_t pfnNativeEnqueue,
-    /// [in][optional] data used by pfnNativeEnqueue
-    void *data,
-    /// [in] size of the mem list
-    uint32_t numMemsInMemList,
-    /// [in][optional][range(0, numMemsInMemList)] mems that are used within
-    /// pfnNativeEnqueue using ::urMemGetNativeHandle.
-    /// If nullptr, the numMemsInMemList must be 0, indicating that no mems
-    /// are accessed with ::urMemGetNativeHandle within pfnNativeEnqueue.
-    const ur_mem_handle_t *phMemList,
-    /// [in][optional] pointer to the native enqueue properties
-    const ur_exp_enqueue_native_command_properties_t *pProperties,
-    /// [in] size of the event wait list
-    uint32_t numEventsInWaitList,
-    /// [in][optional][range(0, numEventsInWaitList)] pointer to a list of
-    /// events that must be complete before the kernel execution.
-    /// If nullptr, the numEventsInWaitList must be 0, indicating no wait
-    /// events.
-    const ur_event_handle_t *phEventWaitList,
-    /// [out][optional][alloc] return an event object that identifies the work
-    /// that has
-    /// been enqueued in nativeEnqueueFunc. If phEventWaitList and phEvent are
-    /// not NULL, phEvent must not refer to an element of the phEventWaitList
-    /// array.
-    ur_event_handle_t *phEvent) {
   ur_result_t result = UR_RESULT_SUCCESS;
   return result;
 }

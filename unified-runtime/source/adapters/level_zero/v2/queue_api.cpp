@@ -433,15 +433,6 @@ ur_result_t urEnqueueTimestampRecordingExp(
 } catch (...) {
   return exceptionToResult(std::current_exception());
 }
-ur_result_t urEnqueueCommandBufferExp(
-    ur_queue_handle_t hQueue, ur_exp_command_buffer_handle_t hCommandBuffer,
-    uint32_t numEventsInWaitList, const ur_event_handle_t *phEventWaitList,
-    ur_event_handle_t *phEvent) try {
-  return hQueue->get().enqueueCommandBufferExp(
-      hCommandBuffer, numEventsInWaitList, phEventWaitList, phEvent);
-} catch (...) {
-  return exceptionToResult(std::current_exception());
-}
 ur_result_t urEnqueueHostTaskExp(
     ur_queue_handle_t hQueue, ur_exp_host_task_function_t pfnHostTask,
     void *data, const ur_exp_host_task_properties_t *pProperties,
@@ -473,6 +464,15 @@ ur_result_t urEnqueueNativeCommandExp(
   return hQueue->get().enqueueNativeCommandExp(
       pfnNativeEnqueue, data, numMemsInMemList, phMemList, pProperties,
       numEventsInWaitList, phEventWaitList, phEvent);
+} catch (...) {
+  return exceptionToResult(std::current_exception());
+}
+ur_result_t urEnqueueCommandBufferExp(
+    ur_queue_handle_t hQueue, ur_exp_command_buffer_handle_t hCommandBuffer,
+    uint32_t numEventsInWaitList, const ur_event_handle_t *phEventWaitList,
+    ur_event_handle_t *phEvent) try {
+  return hQueue->get().enqueueCommandBufferExp(
+      hCommandBuffer, numEventsInWaitList, phEventWaitList, phEvent);
 } catch (...) {
   return exceptionToResult(std::current_exception());
 }

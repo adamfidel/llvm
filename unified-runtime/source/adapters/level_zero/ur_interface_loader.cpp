@@ -144,6 +144,8 @@ UR_APIEXPORT ur_result_t UR_APICALL urGetCommandBufferExpProcAddrTable(
       ur::level_zero::urCommandBufferAppendUSMAdviseExp;
   pDdiTable->pfnAppendNativeCommandExp =
       ur::level_zero::urCommandBufferAppendNativeCommandExp;
+  pDdiTable->pfnAppendHostTaskExp =
+      ur::level_zero::urCommandBufferAppendHostTaskExp;
   pDdiTable->pfnUpdateKernelLaunchExp =
       ur::level_zero::urCommandBufferUpdateKernelLaunchExp;
   pDdiTable->pfnUpdateSignalEventExp =
@@ -233,9 +235,9 @@ UR_APIEXPORT ur_result_t UR_APICALL urGetEnqueueExpProcAddrTable(
   pDdiTable->pfnUSMFreeExp = ur::level_zero::urEnqueueUSMFreeExp;
   pDdiTable->pfnTimestampRecordingExp =
       ur::level_zero::urEnqueueTimestampRecordingExp;
-  pDdiTable->pfnCommandBufferExp = ur::level_zero::urEnqueueCommandBufferExp;
   pDdiTable->pfnHostTaskExp = ur::level_zero::urEnqueueHostTaskExp;
   pDdiTable->pfnNativeCommandExp = ur::level_zero::urEnqueueNativeCommandExp;
+  pDdiTable->pfnCommandBufferExp = ur::level_zero::urEnqueueCommandBufferExp;
   pDdiTable->pfnGraphExp = ur::level_zero::urEnqueueGraphExp;
 
   return result;

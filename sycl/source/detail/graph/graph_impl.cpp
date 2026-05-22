@@ -362,11 +362,6 @@ graph_impl::graph_impl(const sycl::context &SyclContext,
 
 graph_impl::~graph_impl() {
   try {
-    for (auto &Cb : MDestructionCallbacks) {
-      Cb();
-    }
-    MDestructionCallbacks.clear();
-
     clearQueues(false /*Needs lock*/);
     for (auto &MemObj : MMemObjs) {
       MemObj->markNoLongerBeingUsedInGraph();
@@ -386,6 +381,9 @@ graph_impl::~graph_impl() {
                               "Failed to destroy native UR graph");
       }
       MNativeGraphHandle = nullptr;
+    }
+    for (auto &Cb : MDestructionCallbacks) {
+      Cb();
     }
   } catch (std::exception &e) {
     __SYCL_REPORT_EXCEPTION_TO_STREAM("exception in ~graph_impl", e);

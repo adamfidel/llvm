@@ -8851,6 +8851,78 @@ __urdlllocal ur_result_t UR_APICALL urEnqueueTimestampRecordingExp(
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+/// @brief Intercept function for urEnqueueHostTaskExp
+__urdlllocal ur_result_t UR_APICALL urEnqueueHostTaskExp(
+    /// [in] handle of the queue object
+    ur_queue_handle_t hQueue,
+    /// [in] Host task callback function. Must not call any UR functions.
+    ur_exp_host_task_function_t pfnHostTask,
+    /// [in][optional] data used by pfnHostTask
+    void *data,
+    /// [in][optional] pointer to the host task properties
+    const ur_exp_host_task_properties_t *pProperties,
+    /// [in] size of the event wait list
+    uint32_t numEventsInWaitList,
+    /// [in][optional][range(0, numEventsInWaitList)] pointer to a list of
+    /// events that must be complete before the kernel execution.
+    /// If nullptr, the numEventsInWaitList must be 0, indicating no wait
+    /// events.
+    const ur_event_handle_t *phEventWaitList,
+    /// [out][optional][alloc] return an event object that identifies the work
+    /// that has
+    /// been enqueued in nativeEnqueueFunc. If phEventWaitList and phEvent are
+    /// not NULL, phEvent must not refer to an element of the phEventWaitList
+    /// array.
+    ur_event_handle_t *phEvent) {
+  auto pfnHostTaskExp = getContext()->urDdiTable.EnqueueExp.pfnHostTaskExp;
+
+  if (nullptr == pfnHostTaskExp) {
+    return UR_RESULT_ERROR_UNINITIALIZED;
+  }
+
+  if (getContext()->enableParameterValidation) {
+    if (NULL == pfnHostTask)
+      return UR_RESULT_ERROR_INVALID_NULL_POINTER;
+
+    if (NULL == hQueue)
+      return UR_RESULT_ERROR_INVALID_NULL_HANDLE;
+
+    if (NULL != pProperties && UR_EXP_HOST_TASK_FLAGS_MASK & pProperties->flags)
+      return UR_RESULT_ERROR_INVALID_ENUMERATION;
+
+    if (phEventWaitList == NULL && numEventsInWaitList > 0)
+      return UR_RESULT_ERROR_INVALID_EVENT_WAIT_LIST;
+
+    if (phEventWaitList != NULL && numEventsInWaitList == 0)
+      return UR_RESULT_ERROR_INVALID_EVENT_WAIT_LIST;
+
+    if (phEventWaitList != NULL && numEventsInWaitList > 0) {
+      for (uint32_t i = 0; i < numEventsInWaitList; ++i) {
+        if (phEventWaitList[i] == NULL) {
+          return UR_RESULT_ERROR_INVALID_EVENT_WAIT_LIST;
+        }
+      }
+    }
+  }
+
+  if (getContext()->enableLifetimeValidation &&
+      !getContext()->refCountContext->isReferenceValid(hQueue)) {
+    URLOG_CTX_INVALID_REFERENCE(hQueue);
+  }
+
+  ur_result_t result =
+      pfnHostTaskExp(hQueue, pfnHostTask, data, pProperties,
+                     numEventsInWaitList, phEventWaitList, phEvent);
+
+  if (getContext()->enableLeakChecking && result == UR_RESULT_SUCCESS &&
+      phEvent) {
+    getContext()->refCountContext->createRefCount(*phEvent);
+  }
+
+  return result;
+}
+
+///////////////////////////////////////////////////////////////////////////////
 /// @brief Intercept function for urIPCGetMemHandleExp
 __urdlllocal ur_result_t UR_APICALL urIPCGetMemHandleExp(
     /// [in] handle of the context object
@@ -9614,219 +9686,6 @@ __urdlllocal ur_result_t UR_APICALL urUsmP2PPeerAccessGetInfoExp(
 
   ur_result_t result = pfnPeerAccessGetInfoExp(
       commandDevice, peerDevice, propName, propSize, pPropValue, pPropSizeRet);
-
-  return result;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-/// @brief Intercept function for urEnqueueHostTaskExp
-__urdlllocal ur_result_t UR_APICALL urEnqueueHostTaskExp(
-    /// [in] handle of the queue object
-    ur_queue_handle_t hQueue,
-    /// [in] Host task callback function. Must not call any UR functions.
-    ur_exp_host_task_function_t pfnHostTask,
-    /// [in][optional] data used by pfnHostTask
-    void *data,
-    /// [in][optional] pointer to the host task properties
-    const ur_exp_host_task_properties_t *pProperties,
-    /// [in] size of the event wait list
-    uint32_t numEventsInWaitList,
-    /// [in][optional][range(0, numEventsInWaitList)] pointer to a list of
-    /// events that must be complete before the kernel execution.
-    /// If nullptr, the numEventsInWaitList must be 0, indicating no wait
-    /// events.
-    const ur_event_handle_t *phEventWaitList,
-    /// [out][optional][alloc] return an event object that identifies the work
-    /// that has
-    /// been enqueued in nativeEnqueueFunc. If phEventWaitList and phEvent are
-    /// not NULL, phEvent must not refer to an element of the phEventWaitList
-    /// array.
-    ur_event_handle_t *phEvent) {
-  auto pfnHostTaskExp = getContext()->urDdiTable.EnqueueExp.pfnHostTaskExp;
-
-  if (nullptr == pfnHostTaskExp) {
-    return UR_RESULT_ERROR_UNINITIALIZED;
-  }
-
-  if (getContext()->enableParameterValidation) {
-    if (NULL == pfnHostTask)
-      return UR_RESULT_ERROR_INVALID_NULL_POINTER;
-
-    if (NULL == hQueue)
-      return UR_RESULT_ERROR_INVALID_NULL_HANDLE;
-
-    if (NULL != pProperties && UR_EXP_HOST_TASK_FLAGS_MASK & pProperties->flags)
-      return UR_RESULT_ERROR_INVALID_ENUMERATION;
-
-    if (phEventWaitList == NULL && numEventsInWaitList > 0)
-      return UR_RESULT_ERROR_INVALID_EVENT_WAIT_LIST;
-
-    if (phEventWaitList != NULL && numEventsInWaitList == 0)
-      return UR_RESULT_ERROR_INVALID_EVENT_WAIT_LIST;
-
-    if (phEventWaitList != NULL && numEventsInWaitList > 0) {
-      for (uint32_t i = 0; i < numEventsInWaitList; ++i) {
-        if (phEventWaitList[i] == NULL) {
-          return UR_RESULT_ERROR_INVALID_EVENT_WAIT_LIST;
-        }
-      }
-    }
-  }
-
-  if (getContext()->enableLifetimeValidation &&
-      !getContext()->refCountContext->isReferenceValid(hQueue)) {
-    URLOG_CTX_INVALID_REFERENCE(hQueue);
-  }
-
-  ur_result_t result =
-      pfnHostTaskExp(hQueue, pfnHostTask, data, pProperties,
-                     numEventsInWaitList, phEventWaitList, phEvent);
-
-  if (getContext()->enableLeakChecking && result == UR_RESULT_SUCCESS &&
-      phEvent) {
-    getContext()->refCountContext->createRefCount(*phEvent);
-  }
-
-  return result;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-/// @brief Intercept function for urEnqueueEventsWaitWithBarrierExt
-__urdlllocal ur_result_t UR_APICALL urEnqueueEventsWaitWithBarrierExt(
-    /// [in] handle of the queue object
-    ur_queue_handle_t hQueue,
-    /// [in][optional] pointer to the extended enqueue properties
-    const ur_exp_enqueue_ext_properties_t *pProperties,
-    /// [in] size of the event wait list
-    uint32_t numEventsInWaitList,
-    /// [in][optional][range(0, numEventsInWaitList)] pointer to a list of
-    /// events that must be complete before this command can be executed.
-    /// If nullptr, the numEventsInWaitList must be 0, indicating that all
-    /// previously enqueued commands
-    /// must be complete.
-    const ur_event_handle_t *phEventWaitList,
-    /// [out][optional][alloc] return an event object that identifies this
-    /// particular command instance. If phEventWaitList and phEvent are not
-    /// NULL, phEvent must not refer to an element of the phEventWaitList array.
-    ur_event_handle_t *phEvent) {
-  auto pfnEventsWaitWithBarrierExt =
-      getContext()->urDdiTable.Enqueue.pfnEventsWaitWithBarrierExt;
-
-  if (nullptr == pfnEventsWaitWithBarrierExt) {
-    return UR_RESULT_ERROR_UNINITIALIZED;
-  }
-
-  if (getContext()->enableParameterValidation) {
-    if (NULL == hQueue)
-      return UR_RESULT_ERROR_INVALID_NULL_HANDLE;
-
-    if (NULL != pProperties &&
-        UR_EXP_ENQUEUE_EXT_FLAGS_MASK & pProperties->flags)
-      return UR_RESULT_ERROR_INVALID_ENUMERATION;
-
-    if (phEventWaitList == NULL && numEventsInWaitList > 0)
-      return UR_RESULT_ERROR_INVALID_EVENT_WAIT_LIST;
-
-    if (phEventWaitList != NULL && numEventsInWaitList == 0)
-      return UR_RESULT_ERROR_INVALID_EVENT_WAIT_LIST;
-
-    if (phEventWaitList != NULL && numEventsInWaitList > 0) {
-      for (uint32_t i = 0; i < numEventsInWaitList; ++i) {
-        if (phEventWaitList[i] == NULL) {
-          return UR_RESULT_ERROR_INVALID_EVENT_WAIT_LIST;
-        }
-      }
-    }
-  }
-
-  if (getContext()->enableLifetimeValidation &&
-      !getContext()->refCountContext->isReferenceValid(hQueue)) {
-    URLOG_CTX_INVALID_REFERENCE(hQueue);
-  }
-
-  ur_result_t result = pfnEventsWaitWithBarrierExt(
-      hQueue, pProperties, numEventsInWaitList, phEventWaitList, phEvent);
-
-  if (getContext()->enableLeakChecking && result == UR_RESULT_SUCCESS &&
-      phEvent) {
-    getContext()->refCountContext->createRefCount(*phEvent);
-  }
-
-  return result;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-/// @brief Intercept function for urEnqueueNativeCommandExp
-__urdlllocal ur_result_t UR_APICALL urEnqueueNativeCommandExp(
-    /// [in] handle of the queue object
-    ur_queue_handle_t hQueue,
-    /// [in] function calling the native underlying API, to be executed
-    /// immediately.
-    ur_exp_enqueue_native_command_function_t pfnNativeEnqueue,
-    /// [in][optional] data used by pfnNativeEnqueue
-    void *data,
-    /// [in] size of the mem list
-    uint32_t numMemsInMemList,
-    /// [in][optional][range(0, numMemsInMemList)] mems that are used within
-    /// pfnNativeEnqueue using ::urMemGetNativeHandle.
-    /// If nullptr, the numMemsInMemList must be 0, indicating that no mems
-    /// are accessed with ::urMemGetNativeHandle within pfnNativeEnqueue.
-    const ur_mem_handle_t *phMemList,
-    /// [in][optional] pointer to the native enqueue properties
-    const ur_exp_enqueue_native_command_properties_t *pProperties,
-    /// [in] size of the event wait list
-    uint32_t numEventsInWaitList,
-    /// [in][optional][range(0, numEventsInWaitList)] pointer to a list of
-    /// events that must be complete before the kernel execution.
-    /// If nullptr, the numEventsInWaitList must be 0, indicating no wait
-    /// events.
-    const ur_event_handle_t *phEventWaitList,
-    /// [out][optional][alloc] return an event object that identifies the work
-    /// that has
-    /// been enqueued in nativeEnqueueFunc. If phEventWaitList and phEvent are
-    /// not NULL, phEvent must not refer to an element of the phEventWaitList
-    /// array.
-    ur_event_handle_t *phEvent) {
-  auto pfnNativeCommandExp =
-      getContext()->urDdiTable.EnqueueExp.pfnNativeCommandExp;
-
-  if (nullptr == pfnNativeCommandExp) {
-    return UR_RESULT_ERROR_UNINITIALIZED;
-  }
-
-  if (getContext()->enableParameterValidation) {
-    if (NULL == pfnNativeEnqueue)
-      return UR_RESULT_ERROR_INVALID_NULL_POINTER;
-
-    if (NULL == hQueue)
-      return UR_RESULT_ERROR_INVALID_NULL_HANDLE;
-
-    if (NULL != pProperties &&
-        UR_EXP_ENQUEUE_NATIVE_COMMAND_FLAGS_MASK & pProperties->flags)
-      return UR_RESULT_ERROR_INVALID_ENUMERATION;
-
-    if (phEventWaitList != NULL && numEventsInWaitList > 0) {
-      for (uint32_t i = 0; i < numEventsInWaitList; ++i) {
-        if (phEventWaitList[i] == NULL) {
-          return UR_RESULT_ERROR_INVALID_EVENT_WAIT_LIST;
-        }
-      }
-    }
-  }
-
-  if (getContext()->enableLifetimeValidation &&
-      !getContext()->refCountContext->isReferenceValid(hQueue)) {
-    URLOG_CTX_INVALID_REFERENCE(hQueue);
-  }
-
-  ur_result_t result = pfnNativeCommandExp(
-      hQueue, pfnNativeEnqueue, data, numMemsInMemList, phMemList, pProperties,
-      numEventsInWaitList, phEventWaitList, phEvent);
-
-  if (getContext()->enableLeakChecking && result == UR_RESULT_SUCCESS &&
-      phEvent) {
-    getContext()->refCountContext->createRefCount(*phEvent);
-  }
 
   return result;
 }
@@ -11492,6 +11351,147 @@ __urdlllocal ur_result_t UR_APICALL urCommandBufferGetNativeHandleExp(
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+/// @brief Intercept function for urEnqueueEventsWaitWithBarrierExt
+__urdlllocal ur_result_t UR_APICALL urEnqueueEventsWaitWithBarrierExt(
+    /// [in] handle of the queue object
+    ur_queue_handle_t hQueue,
+    /// [in][optional] pointer to the extended enqueue properties
+    const ur_exp_enqueue_ext_properties_t *pProperties,
+    /// [in] size of the event wait list
+    uint32_t numEventsInWaitList,
+    /// [in][optional][range(0, numEventsInWaitList)] pointer to a list of
+    /// events that must be complete before this command can be executed.
+    /// If nullptr, the numEventsInWaitList must be 0, indicating that all
+    /// previously enqueued commands
+    /// must be complete.
+    const ur_event_handle_t *phEventWaitList,
+    /// [out][optional][alloc] return an event object that identifies this
+    /// particular command instance. If phEventWaitList and phEvent are not
+    /// NULL, phEvent must not refer to an element of the phEventWaitList array.
+    ur_event_handle_t *phEvent) {
+  auto pfnEventsWaitWithBarrierExt =
+      getContext()->urDdiTable.Enqueue.pfnEventsWaitWithBarrierExt;
+
+  if (nullptr == pfnEventsWaitWithBarrierExt) {
+    return UR_RESULT_ERROR_UNINITIALIZED;
+  }
+
+  if (getContext()->enableParameterValidation) {
+    if (NULL == hQueue)
+      return UR_RESULT_ERROR_INVALID_NULL_HANDLE;
+
+    if (NULL != pProperties &&
+        UR_EXP_ENQUEUE_EXT_FLAGS_MASK & pProperties->flags)
+      return UR_RESULT_ERROR_INVALID_ENUMERATION;
+
+    if (phEventWaitList == NULL && numEventsInWaitList > 0)
+      return UR_RESULT_ERROR_INVALID_EVENT_WAIT_LIST;
+
+    if (phEventWaitList != NULL && numEventsInWaitList == 0)
+      return UR_RESULT_ERROR_INVALID_EVENT_WAIT_LIST;
+
+    if (phEventWaitList != NULL && numEventsInWaitList > 0) {
+      for (uint32_t i = 0; i < numEventsInWaitList; ++i) {
+        if (phEventWaitList[i] == NULL) {
+          return UR_RESULT_ERROR_INVALID_EVENT_WAIT_LIST;
+        }
+      }
+    }
+  }
+
+  if (getContext()->enableLifetimeValidation &&
+      !getContext()->refCountContext->isReferenceValid(hQueue)) {
+    URLOG_CTX_INVALID_REFERENCE(hQueue);
+  }
+
+  ur_result_t result = pfnEventsWaitWithBarrierExt(
+      hQueue, pProperties, numEventsInWaitList, phEventWaitList, phEvent);
+
+  if (getContext()->enableLeakChecking && result == UR_RESULT_SUCCESS &&
+      phEvent) {
+    getContext()->refCountContext->createRefCount(*phEvent);
+  }
+
+  return result;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+/// @brief Intercept function for urEnqueueNativeCommandExp
+__urdlllocal ur_result_t UR_APICALL urEnqueueNativeCommandExp(
+    /// [in] handle of the queue object
+    ur_queue_handle_t hQueue,
+    /// [in] function calling the native underlying API, to be executed
+    /// immediately.
+    ur_exp_enqueue_native_command_function_t pfnNativeEnqueue,
+    /// [in][optional] data used by pfnNativeEnqueue
+    void *data,
+    /// [in] size of the mem list
+    uint32_t numMemsInMemList,
+    /// [in][optional][range(0, numMemsInMemList)] mems that are used within
+    /// pfnNativeEnqueue using ::urMemGetNativeHandle.
+    /// If nullptr, the numMemsInMemList must be 0, indicating that no mems
+    /// are accessed with ::urMemGetNativeHandle within pfnNativeEnqueue.
+    const ur_mem_handle_t *phMemList,
+    /// [in][optional] pointer to the native enqueue properties
+    const ur_exp_enqueue_native_command_properties_t *pProperties,
+    /// [in] size of the event wait list
+    uint32_t numEventsInWaitList,
+    /// [in][optional][range(0, numEventsInWaitList)] pointer to a list of
+    /// events that must be complete before the kernel execution.
+    /// If nullptr, the numEventsInWaitList must be 0, indicating no wait
+    /// events.
+    const ur_event_handle_t *phEventWaitList,
+    /// [out][optional][alloc] return an event object that identifies the work
+    /// that has
+    /// been enqueued in nativeEnqueueFunc. If phEventWaitList and phEvent are
+    /// not NULL, phEvent must not refer to an element of the phEventWaitList
+    /// array.
+    ur_event_handle_t *phEvent) {
+  auto pfnNativeCommandExp =
+      getContext()->urDdiTable.EnqueueExp.pfnNativeCommandExp;
+
+  if (nullptr == pfnNativeCommandExp) {
+    return UR_RESULT_ERROR_UNINITIALIZED;
+  }
+
+  if (getContext()->enableParameterValidation) {
+    if (NULL == pfnNativeEnqueue)
+      return UR_RESULT_ERROR_INVALID_NULL_POINTER;
+
+    if (NULL == hQueue)
+      return UR_RESULT_ERROR_INVALID_NULL_HANDLE;
+
+    if (NULL != pProperties &&
+        UR_EXP_ENQUEUE_NATIVE_COMMAND_FLAGS_MASK & pProperties->flags)
+      return UR_RESULT_ERROR_INVALID_ENUMERATION;
+
+    if (phEventWaitList != NULL && numEventsInWaitList > 0) {
+      for (uint32_t i = 0; i < numEventsInWaitList; ++i) {
+        if (phEventWaitList[i] == NULL) {
+          return UR_RESULT_ERROR_INVALID_EVENT_WAIT_LIST;
+        }
+      }
+    }
+  }
+
+  if (getContext()->enableLifetimeValidation &&
+      !getContext()->refCountContext->isReferenceValid(hQueue)) {
+    URLOG_CTX_INVALID_REFERENCE(hQueue);
+  }
+
+  ur_result_t result = pfnNativeCommandExp(
+      hQueue, pfnNativeEnqueue, data, numMemsInMemList, phMemList, pProperties,
+      numEventsInWaitList, phEventWaitList, phEvent);
+
+  if (getContext()->enableLeakChecking && result == UR_RESULT_SUCCESS &&
+      phEvent) {
+    getContext()->refCountContext->createRefCount(*phEvent);
+  }
+
+  return result;
+}
+
+///////////////////////////////////////////////////////////////////////////////
 /// @brief Intercept function for urGraphCreateExp
 __urdlllocal ur_result_t UR_APICALL urGraphCreateExp(
     /// [in] Handle of the context object.
@@ -12390,13 +12390,13 @@ UR_DLLEXPORT ur_result_t UR_APICALL urGetEnqueueExpProcAddrTable(
   dditable.pfnHostTaskExp = pDdiTable->pfnHostTaskExp;
   pDdiTable->pfnHostTaskExp = ur_validation_layer::urEnqueueHostTaskExp;
 
-  dditable.pfnNativeCommandExp = pDdiTable->pfnNativeCommandExp;
-  pDdiTable->pfnNativeCommandExp =
-      ur_validation_layer::urEnqueueNativeCommandExp;
-
   dditable.pfnCommandBufferExp = pDdiTable->pfnCommandBufferExp;
   pDdiTable->pfnCommandBufferExp =
       ur_validation_layer::urEnqueueCommandBufferExp;
+
+  dditable.pfnNativeCommandExp = pDdiTable->pfnNativeCommandExp;
+  pDdiTable->pfnNativeCommandExp =
+      ur_validation_layer::urEnqueueNativeCommandExp;
 
   dditable.pfnGraphExp = pDdiTable->pfnGraphExp;
   pDdiTable->pfnGraphExp = ur_validation_layer::urEnqueueGraphExp;

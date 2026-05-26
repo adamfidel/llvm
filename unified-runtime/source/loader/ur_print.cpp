@@ -1112,6 +1112,23 @@ urPrintExpImageCopyRegion(const struct ur_exp_image_copy_region_t params,
   return str_copy(&ss, buffer, buff_size, out_size);
 }
 
+ur_result_t urPrintExpHostTaskFlags(enum ur_exp_host_task_flag_t value,
+                                    char *buffer, const size_t buff_size,
+                                    size_t *out_size) {
+  std::stringstream ss;
+  ss << value;
+  return str_copy(&ss, buffer, buff_size, out_size);
+}
+
+ur_result_t
+urPrintExpHostTaskProperties(const struct ur_exp_host_task_properties_t params,
+                             char *buffer, const size_t buff_size,
+                             size_t *out_size) {
+  std::stringstream ss;
+  ss << params;
+  return str_copy(&ss, buffer, buff_size, out_size);
+}
+
 ur_result_t urPrintExpProgramFlags(enum ur_exp_program_flag_t value,
                                    char *buffer, const size_t buff_size,
                                    size_t *out_size) {
@@ -1140,55 +1157,6 @@ ur_result_t urPrintExpPeerInfo(enum ur_exp_peer_info_t value, char *buffer,
                                const size_t buff_size, size_t *out_size) {
   std::stringstream ss;
   ss << value;
-  return str_copy(&ss, buffer, buff_size, out_size);
-}
-
-ur_result_t urPrintExpHostTaskFlags(enum ur_exp_host_task_flag_t value,
-                                    char *buffer, const size_t buff_size,
-                                    size_t *out_size) {
-  std::stringstream ss;
-  ss << value;
-  return str_copy(&ss, buffer, buff_size, out_size);
-}
-
-ur_result_t
-urPrintExpHostTaskProperties(const struct ur_exp_host_task_properties_t params,
-                             char *buffer, const size_t buff_size,
-                             size_t *out_size) {
-  std::stringstream ss;
-  ss << params;
-  return str_copy(&ss, buffer, buff_size, out_size);
-}
-
-ur_result_t urPrintExpEnqueueExtFlags(enum ur_exp_enqueue_ext_flag_t value,
-                                      char *buffer, const size_t buff_size,
-                                      size_t *out_size) {
-  std::stringstream ss;
-  ss << value;
-  return str_copy(&ss, buffer, buff_size, out_size);
-}
-
-ur_result_t urPrintExpEnqueueExtProperties(
-    const struct ur_exp_enqueue_ext_properties_t params, char *buffer,
-    const size_t buff_size, size_t *out_size) {
-  std::stringstream ss;
-  ss << params;
-  return str_copy(&ss, buffer, buff_size, out_size);
-}
-
-ur_result_t urPrintExpEnqueueNativeCommandFlags(
-    enum ur_exp_enqueue_native_command_flag_t value, char *buffer,
-    const size_t buff_size, size_t *out_size) {
-  std::stringstream ss;
-  ss << value;
-  return str_copy(&ss, buffer, buff_size, out_size);
-}
-
-ur_result_t urPrintExpEnqueueNativeCommandProperties(
-    const struct ur_exp_enqueue_native_command_properties_t params,
-    char *buffer, const size_t buff_size, size_t *out_size) {
-  std::stringstream ss;
-  ss << params;
   return str_copy(&ss, buffer, buff_size, out_size);
 }
 
@@ -1251,6 +1219,38 @@ ur_result_t urPrintExpCommandBufferUpdateValueArgDesc(
 
 ur_result_t urPrintExpCommandBufferUpdateKernelLaunchDesc(
     const struct ur_exp_command_buffer_update_kernel_launch_desc_t params,
+    char *buffer, const size_t buff_size, size_t *out_size) {
+  std::stringstream ss;
+  ss << params;
+  return str_copy(&ss, buffer, buff_size, out_size);
+}
+
+ur_result_t urPrintExpEnqueueExtFlags(enum ur_exp_enqueue_ext_flag_t value,
+                                      char *buffer, const size_t buff_size,
+                                      size_t *out_size) {
+  std::stringstream ss;
+  ss << value;
+  return str_copy(&ss, buffer, buff_size, out_size);
+}
+
+ur_result_t urPrintExpEnqueueExtProperties(
+    const struct ur_exp_enqueue_ext_properties_t params, char *buffer,
+    const size_t buff_size, size_t *out_size) {
+  std::stringstream ss;
+  ss << params;
+  return str_copy(&ss, buffer, buff_size, out_size);
+}
+
+ur_result_t urPrintExpEnqueueNativeCommandFlags(
+    enum ur_exp_enqueue_native_command_flag_t value, char *buffer,
+    const size_t buff_size, size_t *out_size) {
+  std::stringstream ss;
+  ss << value;
+  return str_copy(&ss, buffer, buff_size, out_size);
+}
+
+ur_result_t urPrintExpEnqueueNativeCommandProperties(
+    const struct ur_exp_enqueue_native_command_properties_t params,
     char *buffer, const size_t buff_size, size_t *out_size) {
   std::stringstream ss;
   ss << params;
@@ -2029,16 +2029,16 @@ ur_result_t urPrintEnqueueHostTaskExpParams(
   return str_copy(&ss, buffer, buff_size, out_size);
 }
 
-ur_result_t urPrintEnqueueNativeCommandExpParams(
-    const struct ur_enqueue_native_command_exp_params_t *params, char *buffer,
+ur_result_t urPrintEnqueueCommandBufferExpParams(
+    const struct ur_enqueue_command_buffer_exp_params_t *params, char *buffer,
     const size_t buff_size, size_t *out_size) {
   std::stringstream ss;
   ss << params;
   return str_copy(&ss, buffer, buff_size, out_size);
 }
 
-ur_result_t urPrintEnqueueCommandBufferExpParams(
-    const struct ur_enqueue_command_buffer_exp_params_t *params, char *buffer,
+ur_result_t urPrintEnqueueNativeCommandExpParams(
+    const struct ur_enqueue_native_command_exp_params_t *params, char *buffer,
     const size_t buff_size, size_t *out_size) {
   std::stringstream ss;
   ss << params;

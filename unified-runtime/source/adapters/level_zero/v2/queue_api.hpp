@@ -162,6 +162,10 @@ struct ur_queue_t_ : ur_queue_extensions {
                                          const ur_exp_host_task_properties_t *,
                                          uint32_t, const ur_event_handle_t *,
                                          ur_event_handle_t *) = 0;
+  virtual ur_result_t enqueueCommandBufferExp(ur_exp_command_buffer_handle_t,
+                                              uint32_t,
+                                              const ur_event_handle_t *,
+                                              ur_event_handle_t *) = 0;
   virtual ur_result_t
   enqueueEventsWaitWithBarrierExt(const ur_exp_enqueue_ext_properties_t *,
                                   uint32_t, const ur_event_handle_t *,
@@ -172,10 +176,6 @@ struct ur_queue_t_ : ur_queue_extensions {
                           const ur_exp_enqueue_native_command_properties_t *,
                           uint32_t, const ur_event_handle_t *,
                           ur_event_handle_t *) = 0;
-  virtual ur_result_t enqueueCommandBufferExp(ur_exp_command_buffer_handle_t,
-                                              uint32_t,
-                                              const ur_event_handle_t *,
-                                              ur_event_handle_t *) = 0;
   virtual ur_result_t queueBeginGraphCapteExp() = 0;
   virtual ur_result_t queueBeginCapteIntoGraphExp(ur_exp_graph_handle_t) = 0;
   virtual ur_result_t queueEndGraphCapteExp(ur_exp_graph_handle_t *) = 0;

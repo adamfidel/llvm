@@ -1172,17 +1172,17 @@ typedef ur_result_t(UR_APICALL *ur_pfnEnqueueHostTaskExp_t)(
     ur_event_handle_t *);
 
 ///////////////////////////////////////////////////////////////////////////////
+/// @brief Function-pointer for urEnqueueCommandBufferExp
+typedef ur_result_t(UR_APICALL *ur_pfnEnqueueCommandBufferExp_t)(
+    ur_queue_handle_t, ur_exp_command_buffer_handle_t, uint32_t,
+    const ur_event_handle_t *, ur_event_handle_t *);
+
+///////////////////////////////////////////////////////////////////////////////
 /// @brief Function-pointer for urEnqueueNativeCommandExp
 typedef ur_result_t(UR_APICALL *ur_pfnEnqueueNativeCommandExp_t)(
     ur_queue_handle_t, ur_exp_enqueue_native_command_function_t, void *,
     uint32_t, const ur_mem_handle_t *,
     const ur_exp_enqueue_native_command_properties_t *, uint32_t,
-    const ur_event_handle_t *, ur_event_handle_t *);
-
-///////////////////////////////////////////////////////////////////////////////
-/// @brief Function-pointer for urEnqueueCommandBufferExp
-typedef ur_result_t(UR_APICALL *ur_pfnEnqueueCommandBufferExp_t)(
-    ur_queue_handle_t, ur_exp_command_buffer_handle_t, uint32_t,
     const ur_event_handle_t *, ur_event_handle_t *);
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1201,8 +1201,8 @@ typedef struct ur_enqueue_exp_dditable_t {
   ur_pfnEnqueueUSMFreeExp_t pfnUSMFreeExp;
   ur_pfnEnqueueTimestampRecordingExp_t pfnTimestampRecordingExp;
   ur_pfnEnqueueHostTaskExp_t pfnHostTaskExp;
-  ur_pfnEnqueueNativeCommandExp_t pfnNativeCommandExp;
   ur_pfnEnqueueCommandBufferExp_t pfnCommandBufferExp;
+  ur_pfnEnqueueNativeCommandExp_t pfnNativeCommandExp;
   ur_pfnEnqueueGraphExp_t pfnGraphExp;
 } ur_enqueue_exp_dditable_t;
 

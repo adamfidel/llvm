@@ -619,6 +619,11 @@ ur_result_t urProgramDynamicLinkExp(ur_context_handle_t hContext,
 ur_result_t urEnqueueTimestampRecordingExp(
     ur_queue_handle_t hQueue, bool blocking, uint32_t numEventsInWaitList,
     const ur_event_handle_t *phEventWaitList, ur_event_handle_t *phEvent);
+ur_result_t urEnqueueHostTaskExp(
+    ur_queue_handle_t hQueue, ur_exp_host_task_function_t pfnHostTask,
+    void *data, const ur_exp_host_task_properties_t *pProperties,
+    uint32_t numEventsInWaitList, const ur_event_handle_t *phEventWaitList,
+    ur_event_handle_t *phEvent);
 ur_result_t urIPCGetMemHandleExp(ur_context_handle_t hContext, void *pMem,
                                  void **ppIPCMemHandleData,
                                  size_t *pIPCMemHandleDataSizeRet);
@@ -673,23 +678,6 @@ ur_result_t urUsmP2PPeerAccessGetInfoExp(ur_device_handle_t commandDevice,
                                          ur_exp_peer_info_t propName,
                                          size_t propSize, void *pPropValue,
                                          size_t *pPropSizeRet);
-ur_result_t urEnqueueHostTaskExp(
-    ur_queue_handle_t hQueue, ur_exp_host_task_function_t pfnHostTask,
-    void *data, const ur_exp_host_task_properties_t *pProperties,
-    uint32_t numEventsInWaitList, const ur_event_handle_t *phEventWaitList,
-    ur_event_handle_t *phEvent);
-ur_result_t urEnqueueEventsWaitWithBarrierExt(
-    ur_queue_handle_t hQueue,
-    const ur_exp_enqueue_ext_properties_t *pProperties,
-    uint32_t numEventsInWaitList, const ur_event_handle_t *phEventWaitList,
-    ur_event_handle_t *phEvent);
-ur_result_t urEnqueueNativeCommandExp(
-    ur_queue_handle_t hQueue,
-    ur_exp_enqueue_native_command_function_t pfnNativeEnqueue, void *data,
-    uint32_t numMemsInMemList, const ur_mem_handle_t *phMemList,
-    const ur_exp_enqueue_native_command_properties_t *pProperties,
-    uint32_t numEventsInWaitList, const ur_event_handle_t *phEventWaitList,
-    ur_event_handle_t *phEvent);
 ur_result_t
 urCommandBufferCreateExp(ur_context_handle_t hContext,
                          ur_device_handle_t hDevice,
@@ -851,6 +839,18 @@ urCommandBufferGetInfoExp(ur_exp_command_buffer_handle_t hCommandBuffer,
 ur_result_t
 urCommandBufferGetNativeHandleExp(ur_exp_command_buffer_handle_t hCommandBuffer,
                                   ur_native_handle_t *phNativeCommandBuffer);
+ur_result_t urEnqueueEventsWaitWithBarrierExt(
+    ur_queue_handle_t hQueue,
+    const ur_exp_enqueue_ext_properties_t *pProperties,
+    uint32_t numEventsInWaitList, const ur_event_handle_t *phEventWaitList,
+    ur_event_handle_t *phEvent);
+ur_result_t urEnqueueNativeCommandExp(
+    ur_queue_handle_t hQueue,
+    ur_exp_enqueue_native_command_function_t pfnNativeEnqueue, void *data,
+    uint32_t numMemsInMemList, const ur_mem_handle_t *phMemList,
+    const ur_exp_enqueue_native_command_properties_t *pProperties,
+    uint32_t numEventsInWaitList, const ur_event_handle_t *phEventWaitList,
+    ur_event_handle_t *phEvent);
 ur_result_t urGraphCreateExp(ur_context_handle_t hContext,
                              ur_exp_graph_handle_t *phGraph);
 ur_result_t urQueueBeginGraphCaptureExp(ur_queue_handle_t hQueue);

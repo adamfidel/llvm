@@ -254,6 +254,10 @@ inline ur_result_t printFlag<ur_exp_image_copy_flag_t>(std::ostream &os,
                                                        uint32_t flag);
 
 template <>
+inline ur_result_t printFlag<ur_exp_host_task_flag_t>(std::ostream &os,
+                                                      uint32_t flag);
+
+template <>
 inline ur_result_t printFlag<ur_exp_program_flag_t>(std::ostream &os,
                                                     uint32_t flag);
 
@@ -267,19 +271,6 @@ inline ur_result_t printTagged(std::ostream &os, const void *ptr,
                                ur_exp_peer_info_t value, size_t size);
 
 template <>
-inline ur_result_t printFlag<ur_exp_host_task_flag_t>(std::ostream &os,
-                                                      uint32_t flag);
-
-template <>
-inline ur_result_t printFlag<ur_exp_enqueue_ext_flag_t>(std::ostream &os,
-                                                        uint32_t flag);
-
-template <>
-inline ur_result_t
-printFlag<ur_exp_enqueue_native_command_flag_t>(std::ostream &os,
-                                                uint32_t flag);
-
-template <>
 inline ur_result_t
 printFlag<ur_device_command_buffer_update_capability_flag_t>(std::ostream &os,
                                                              uint32_t flag);
@@ -291,6 +282,15 @@ template <>
 inline ur_result_t printTagged(std::ostream &os, const void *ptr,
                                ur_exp_command_buffer_command_info_t value,
                                size_t size);
+
+template <>
+inline ur_result_t printFlag<ur_exp_enqueue_ext_flag_t>(std::ostream &os,
+                                                        uint32_t flag);
+
+template <>
+inline ur_result_t
+printFlag<ur_exp_enqueue_native_command_flag_t>(std::ostream &os,
+                                                uint32_t flag);
 
 } // namespace ur::details
 
@@ -603,6 +603,11 @@ inline std::ostream &
 operator<<(std::ostream &os,
            [[maybe_unused]] const struct ur_exp_image_copy_region_t params);
 inline std::ostream &operator<<(std::ostream &os,
+                                enum ur_exp_host_task_flag_t value);
+inline std::ostream &
+operator<<(std::ostream &os,
+           [[maybe_unused]] const struct ur_exp_host_task_properties_t params);
+inline std::ostream &operator<<(std::ostream &os,
                                 enum ur_exp_program_flag_t value);
 inline std::ostream &
 operator<<(std::ostream &os, enum ur_exp_usm_host_alloc_register_flag_t value);
@@ -612,22 +617,6 @@ inline std::ostream &operator<<(
         params);
 inline std::ostream &operator<<(std::ostream &os,
                                 enum ur_exp_peer_info_t value);
-inline std::ostream &operator<<(std::ostream &os,
-                                enum ur_exp_host_task_flag_t value);
-inline std::ostream &
-operator<<(std::ostream &os,
-           [[maybe_unused]] const struct ur_exp_host_task_properties_t params);
-inline std::ostream &operator<<(std::ostream &os,
-                                enum ur_exp_enqueue_ext_flag_t value);
-inline std::ostream &operator<<(
-    std::ostream &os,
-    [[maybe_unused]] const struct ur_exp_enqueue_ext_properties_t params);
-inline std::ostream &
-operator<<(std::ostream &os, enum ur_exp_enqueue_native_command_flag_t value);
-inline std::ostream &operator<<(
-    std::ostream &os,
-    [[maybe_unused]] const struct ur_exp_enqueue_native_command_properties_t
-        params);
 inline std::ostream &
 operator<<(std::ostream &os,
            enum ur_device_command_buffer_update_capability_flag_t value);
@@ -652,6 +641,17 @@ inline std::ostream &operator<<(
 inline std::ostream &
 operator<<(std::ostream &os, [[maybe_unused]] const struct
            ur_exp_command_buffer_update_kernel_launch_desc_t params);
+inline std::ostream &operator<<(std::ostream &os,
+                                enum ur_exp_enqueue_ext_flag_t value);
+inline std::ostream &operator<<(
+    std::ostream &os,
+    [[maybe_unused]] const struct ur_exp_enqueue_ext_properties_t params);
+inline std::ostream &
+operator<<(std::ostream &os, enum ur_exp_enqueue_native_command_flag_t value);
+inline std::ostream &operator<<(
+    std::ostream &os,
+    [[maybe_unused]] const struct ur_exp_enqueue_native_command_properties_t
+        params);
 
 ///////////////////////////////////////////////////////////////////////////////
 /// @brief Print operator for the ur_function_t type
@@ -12347,6 +12347,80 @@ operator<<(std::ostream &os, const struct ur_exp_image_copy_region_t params) {
   return os;
 }
 ///////////////////////////////////////////////////////////////////////////////
+/// @brief Print operator for the ur_exp_host_task_flag_t type
+/// @returns
+///     std::ostream &
+inline std::ostream &operator<<(std::ostream &os,
+                                enum ur_exp_host_task_flag_t value) {
+  switch (value) {
+  case UR_EXP_HOST_TASK_FLAG_TBD:
+    os << "UR_EXP_HOST_TASK_FLAG_TBD";
+    break;
+  default:
+    os << "unknown enumerator";
+    break;
+  }
+  return os;
+}
+
+namespace ur::details {
+///////////////////////////////////////////////////////////////////////////////
+/// @brief Print ur_exp_host_task_flag_t flag
+template <>
+inline ur_result_t printFlag<ur_exp_host_task_flag_t>(std::ostream &os,
+                                                      uint32_t flag) {
+  uint32_t val = flag;
+  bool first = true;
+
+  if ((val & UR_EXP_HOST_TASK_FLAG_TBD) ==
+      (uint32_t)UR_EXP_HOST_TASK_FLAG_TBD) {
+    val ^= (uint32_t)UR_EXP_HOST_TASK_FLAG_TBD;
+    if (!first) {
+      os << " | ";
+    } else {
+      first = false;
+    }
+    os << UR_EXP_HOST_TASK_FLAG_TBD;
+  }
+  if (val != 0) {
+    std::bitset<32> bits(val);
+    if (!first) {
+      os << " | ";
+    }
+    os << "unknown bit flags " << bits;
+  } else if (first) {
+    os << "0";
+  }
+  return UR_RESULT_SUCCESS;
+}
+} // namespace ur::details
+///////////////////////////////////////////////////////////////////////////////
+/// @brief Print operator for the ur_exp_host_task_properties_t type
+/// @returns
+///     std::ostream &
+inline std::ostream &
+operator<<(std::ostream &os,
+           const struct ur_exp_host_task_properties_t params) {
+  os << "(struct ur_exp_host_task_properties_t){";
+
+  os << ".stype = ";
+
+  os << (params.stype);
+
+  os << ", ";
+  os << ".pNext = ";
+
+  ur::details::printStruct(os, (params.pNext));
+
+  os << ", ";
+  os << ".flags = ";
+
+  ur::details::printFlag<ur_exp_host_task_flag_t>(os, (params.flags));
+
+  os << "}";
+  return os;
+}
+///////////////////////////////////////////////////////////////////////////////
 /// @brief Print operator for the ur_exp_program_flag_t type
 /// @returns
 ///     std::ostream &
@@ -12535,231 +12609,6 @@ inline ur_result_t printTagged(std::ostream &os, const void *ptr,
 }
 } // namespace ur::details
 
-///////////////////////////////////////////////////////////////////////////////
-/// @brief Print operator for the ur_exp_host_task_flag_t type
-/// @returns
-///     std::ostream &
-inline std::ostream &operator<<(std::ostream &os,
-                                enum ur_exp_host_task_flag_t value) {
-  switch (value) {
-  case UR_EXP_HOST_TASK_FLAG_TBD:
-    os << "UR_EXP_HOST_TASK_FLAG_TBD";
-    break;
-  default:
-    os << "unknown enumerator";
-    break;
-  }
-  return os;
-}
-
-namespace ur::details {
-///////////////////////////////////////////////////////////////////////////////
-/// @brief Print ur_exp_host_task_flag_t flag
-template <>
-inline ur_result_t printFlag<ur_exp_host_task_flag_t>(std::ostream &os,
-                                                      uint32_t flag) {
-  uint32_t val = flag;
-  bool first = true;
-
-  if ((val & UR_EXP_HOST_TASK_FLAG_TBD) ==
-      (uint32_t)UR_EXP_HOST_TASK_FLAG_TBD) {
-    val ^= (uint32_t)UR_EXP_HOST_TASK_FLAG_TBD;
-    if (!first) {
-      os << " | ";
-    } else {
-      first = false;
-    }
-    os << UR_EXP_HOST_TASK_FLAG_TBD;
-  }
-  if (val != 0) {
-    std::bitset<32> bits(val);
-    if (!first) {
-      os << " | ";
-    }
-    os << "unknown bit flags " << bits;
-  } else if (first) {
-    os << "0";
-  }
-  return UR_RESULT_SUCCESS;
-}
-} // namespace ur::details
-///////////////////////////////////////////////////////////////////////////////
-/// @brief Print operator for the ur_exp_host_task_properties_t type
-/// @returns
-///     std::ostream &
-inline std::ostream &
-operator<<(std::ostream &os,
-           const struct ur_exp_host_task_properties_t params) {
-  os << "(struct ur_exp_host_task_properties_t){";
-
-  os << ".stype = ";
-
-  os << (params.stype);
-
-  os << ", ";
-  os << ".pNext = ";
-
-  ur::details::printStruct(os, (params.pNext));
-
-  os << ", ";
-  os << ".flags = ";
-
-  ur::details::printFlag<ur_exp_host_task_flag_t>(os, (params.flags));
-
-  os << "}";
-  return os;
-}
-///////////////////////////////////////////////////////////////////////////////
-/// @brief Print operator for the ur_exp_enqueue_ext_flag_t type
-/// @returns
-///     std::ostream &
-inline std::ostream &operator<<(std::ostream &os,
-                                enum ur_exp_enqueue_ext_flag_t value) {
-  switch (value) {
-  case UR_EXP_ENQUEUE_EXT_FLAG_LOW_POWER_EVENTS_SUPPORT:
-    os << "UR_EXP_ENQUEUE_EXT_FLAG_LOW_POWER_EVENTS_SUPPORT";
-    break;
-  default:
-    os << "unknown enumerator";
-    break;
-  }
-  return os;
-}
-
-namespace ur::details {
-///////////////////////////////////////////////////////////////////////////////
-/// @brief Print ur_exp_enqueue_ext_flag_t flag
-template <>
-inline ur_result_t printFlag<ur_exp_enqueue_ext_flag_t>(std::ostream &os,
-                                                        uint32_t flag) {
-  uint32_t val = flag;
-  bool first = true;
-
-  if ((val & UR_EXP_ENQUEUE_EXT_FLAG_LOW_POWER_EVENTS_SUPPORT) ==
-      (uint32_t)UR_EXP_ENQUEUE_EXT_FLAG_LOW_POWER_EVENTS_SUPPORT) {
-    val ^= (uint32_t)UR_EXP_ENQUEUE_EXT_FLAG_LOW_POWER_EVENTS_SUPPORT;
-    if (!first) {
-      os << " | ";
-    } else {
-      first = false;
-    }
-    os << UR_EXP_ENQUEUE_EXT_FLAG_LOW_POWER_EVENTS_SUPPORT;
-  }
-  if (val != 0) {
-    std::bitset<32> bits(val);
-    if (!first) {
-      os << " | ";
-    }
-    os << "unknown bit flags " << bits;
-  } else if (first) {
-    os << "0";
-  }
-  return UR_RESULT_SUCCESS;
-}
-} // namespace ur::details
-///////////////////////////////////////////////////////////////////////////////
-/// @brief Print operator for the ur_exp_enqueue_ext_properties_t type
-/// @returns
-///     std::ostream &
-inline std::ostream &
-operator<<(std::ostream &os,
-           const struct ur_exp_enqueue_ext_properties_t params) {
-  os << "(struct ur_exp_enqueue_ext_properties_t){";
-
-  os << ".stype = ";
-
-  os << (params.stype);
-
-  os << ", ";
-  os << ".pNext = ";
-
-  ur::details::printStruct(os, (params.pNext));
-
-  os << ", ";
-  os << ".flags = ";
-
-  ur::details::printFlag<ur_exp_enqueue_ext_flag_t>(os, (params.flags));
-
-  os << "}";
-  return os;
-}
-///////////////////////////////////////////////////////////////////////////////
-/// @brief Print operator for the ur_exp_enqueue_native_command_flag_t type
-/// @returns
-///     std::ostream &
-inline std::ostream &
-operator<<(std::ostream &os, enum ur_exp_enqueue_native_command_flag_t value) {
-  switch (value) {
-  case UR_EXP_ENQUEUE_NATIVE_COMMAND_FLAG_TBD:
-    os << "UR_EXP_ENQUEUE_NATIVE_COMMAND_FLAG_TBD";
-    break;
-  default:
-    os << "unknown enumerator";
-    break;
-  }
-  return os;
-}
-
-namespace ur::details {
-///////////////////////////////////////////////////////////////////////////////
-/// @brief Print ur_exp_enqueue_native_command_flag_t flag
-template <>
-inline ur_result_t
-printFlag<ur_exp_enqueue_native_command_flag_t>(std::ostream &os,
-                                                uint32_t flag) {
-  uint32_t val = flag;
-  bool first = true;
-
-  if ((val & UR_EXP_ENQUEUE_NATIVE_COMMAND_FLAG_TBD) ==
-      (uint32_t)UR_EXP_ENQUEUE_NATIVE_COMMAND_FLAG_TBD) {
-    val ^= (uint32_t)UR_EXP_ENQUEUE_NATIVE_COMMAND_FLAG_TBD;
-    if (!first) {
-      os << " | ";
-    } else {
-      first = false;
-    }
-    os << UR_EXP_ENQUEUE_NATIVE_COMMAND_FLAG_TBD;
-  }
-  if (val != 0) {
-    std::bitset<32> bits(val);
-    if (!first) {
-      os << " | ";
-    }
-    os << "unknown bit flags " << bits;
-  } else if (first) {
-    os << "0";
-  }
-  return UR_RESULT_SUCCESS;
-}
-} // namespace ur::details
-///////////////////////////////////////////////////////////////////////////////
-/// @brief Print operator for the ur_exp_enqueue_native_command_properties_t
-/// type
-/// @returns
-///     std::ostream &
-inline std::ostream &
-operator<<(std::ostream &os,
-           const struct ur_exp_enqueue_native_command_properties_t params) {
-  os << "(struct ur_exp_enqueue_native_command_properties_t){";
-
-  os << ".stype = ";
-
-  os << (params.stype);
-
-  os << ", ";
-  os << ".pNext = ";
-
-  ur::details::printStruct(os, (params.pNext));
-
-  os << ", ";
-  os << ".flags = ";
-
-  ur::details::printFlag<ur_exp_enqueue_native_command_flag_t>(os,
-                                                               (params.flags));
-
-  os << "}";
-  return os;
-}
 ///////////////////////////////////////////////////////////////////////////////
 /// @brief Print operator for the
 /// ur_device_command_buffer_update_capability_flag_t type
@@ -13303,6 +13152,157 @@ inline std::ostream &operator<<(
     }
     os << "}";
   }
+
+  os << "}";
+  return os;
+}
+///////////////////////////////////////////////////////////////////////////////
+/// @brief Print operator for the ur_exp_enqueue_ext_flag_t type
+/// @returns
+///     std::ostream &
+inline std::ostream &operator<<(std::ostream &os,
+                                enum ur_exp_enqueue_ext_flag_t value) {
+  switch (value) {
+  case UR_EXP_ENQUEUE_EXT_FLAG_LOW_POWER_EVENTS_SUPPORT:
+    os << "UR_EXP_ENQUEUE_EXT_FLAG_LOW_POWER_EVENTS_SUPPORT";
+    break;
+  default:
+    os << "unknown enumerator";
+    break;
+  }
+  return os;
+}
+
+namespace ur::details {
+///////////////////////////////////////////////////////////////////////////////
+/// @brief Print ur_exp_enqueue_ext_flag_t flag
+template <>
+inline ur_result_t printFlag<ur_exp_enqueue_ext_flag_t>(std::ostream &os,
+                                                        uint32_t flag) {
+  uint32_t val = flag;
+  bool first = true;
+
+  if ((val & UR_EXP_ENQUEUE_EXT_FLAG_LOW_POWER_EVENTS_SUPPORT) ==
+      (uint32_t)UR_EXP_ENQUEUE_EXT_FLAG_LOW_POWER_EVENTS_SUPPORT) {
+    val ^= (uint32_t)UR_EXP_ENQUEUE_EXT_FLAG_LOW_POWER_EVENTS_SUPPORT;
+    if (!first) {
+      os << " | ";
+    } else {
+      first = false;
+    }
+    os << UR_EXP_ENQUEUE_EXT_FLAG_LOW_POWER_EVENTS_SUPPORT;
+  }
+  if (val != 0) {
+    std::bitset<32> bits(val);
+    if (!first) {
+      os << " | ";
+    }
+    os << "unknown bit flags " << bits;
+  } else if (first) {
+    os << "0";
+  }
+  return UR_RESULT_SUCCESS;
+}
+} // namespace ur::details
+///////////////////////////////////////////////////////////////////////////////
+/// @brief Print operator for the ur_exp_enqueue_ext_properties_t type
+/// @returns
+///     std::ostream &
+inline std::ostream &
+operator<<(std::ostream &os,
+           const struct ur_exp_enqueue_ext_properties_t params) {
+  os << "(struct ur_exp_enqueue_ext_properties_t){";
+
+  os << ".stype = ";
+
+  os << (params.stype);
+
+  os << ", ";
+  os << ".pNext = ";
+
+  ur::details::printStruct(os, (params.pNext));
+
+  os << ", ";
+  os << ".flags = ";
+
+  ur::details::printFlag<ur_exp_enqueue_ext_flag_t>(os, (params.flags));
+
+  os << "}";
+  return os;
+}
+///////////////////////////////////////////////////////////////////////////////
+/// @brief Print operator for the ur_exp_enqueue_native_command_flag_t type
+/// @returns
+///     std::ostream &
+inline std::ostream &
+operator<<(std::ostream &os, enum ur_exp_enqueue_native_command_flag_t value) {
+  switch (value) {
+  case UR_EXP_ENQUEUE_NATIVE_COMMAND_FLAG_TBD:
+    os << "UR_EXP_ENQUEUE_NATIVE_COMMAND_FLAG_TBD";
+    break;
+  default:
+    os << "unknown enumerator";
+    break;
+  }
+  return os;
+}
+
+namespace ur::details {
+///////////////////////////////////////////////////////////////////////////////
+/// @brief Print ur_exp_enqueue_native_command_flag_t flag
+template <>
+inline ur_result_t
+printFlag<ur_exp_enqueue_native_command_flag_t>(std::ostream &os,
+                                                uint32_t flag) {
+  uint32_t val = flag;
+  bool first = true;
+
+  if ((val & UR_EXP_ENQUEUE_NATIVE_COMMAND_FLAG_TBD) ==
+      (uint32_t)UR_EXP_ENQUEUE_NATIVE_COMMAND_FLAG_TBD) {
+    val ^= (uint32_t)UR_EXP_ENQUEUE_NATIVE_COMMAND_FLAG_TBD;
+    if (!first) {
+      os << " | ";
+    } else {
+      first = false;
+    }
+    os << UR_EXP_ENQUEUE_NATIVE_COMMAND_FLAG_TBD;
+  }
+  if (val != 0) {
+    std::bitset<32> bits(val);
+    if (!first) {
+      os << " | ";
+    }
+    os << "unknown bit flags " << bits;
+  } else if (first) {
+    os << "0";
+  }
+  return UR_RESULT_SUCCESS;
+}
+} // namespace ur::details
+///////////////////////////////////////////////////////////////////////////////
+/// @brief Print operator for the ur_exp_enqueue_native_command_properties_t
+/// type
+/// @returns
+///     std::ostream &
+inline std::ostream &
+operator<<(std::ostream &os,
+           const struct ur_exp_enqueue_native_command_properties_t params) {
+  os << "(struct ur_exp_enqueue_native_command_properties_t){";
+
+  os << ".stype = ";
+
+  os << (params.stype);
+
+  os << ", ";
+  os << ".pNext = ";
+
+  ur::details::printStruct(os, (params.pNext));
+
+  os << ", ";
+  os << ".flags = ";
+
+  ur::details::printFlag<ur_exp_enqueue_native_command_flag_t>(os,
+                                                               (params.flags));
 
   os << "}";
   return os;
@@ -18258,6 +18258,53 @@ inline std::ostream &operator<<(
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+/// @brief Print operator for the ur_enqueue_command_buffer_exp_params_t type
+/// @returns
+///     std::ostream &
+inline std::ostream &
+operator<<(std::ostream &os,
+           [[maybe_unused]] const struct ur_enqueue_command_buffer_exp_params_t
+               *params) {
+
+  os << ".hQueue = ";
+
+  ur::details::printPtr(os, *(params->phQueue));
+
+  os << ", ";
+  os << ".hCommandBuffer = ";
+
+  ur::details::printPtr(os, *(params->phCommandBuffer));
+
+  os << ", ";
+  os << ".numEventsInWaitList = ";
+
+  os << *(params->pnumEventsInWaitList);
+
+  os << ", ";
+  os << ".phEventWaitList = ";
+  ur::details::printPtr(
+      os, reinterpret_cast<const void *>(*(params->pphEventWaitList)));
+  if (*(params->pphEventWaitList) != NULL) {
+    os << " {";
+    for (size_t i = 0; i < *params->pnumEventsInWaitList; ++i) {
+      if (i != 0) {
+        os << ", ";
+      }
+
+      ur::details::printPtr(os, (*(params->pphEventWaitList))[i]);
+    }
+    os << "}";
+  }
+
+  os << ", ";
+  os << ".phEvent = ";
+
+  ur::details::printPtr(os, *(params->pphEvent));
+
+  return os;
+}
+
+///////////////////////////////////////////////////////////////////////////////
 /// @brief Print operator for the ur_enqueue_native_command_exp_params_t type
 /// @returns
 ///     std::ostream &
@@ -18305,53 +18352,6 @@ operator<<(std::ostream &os,
   os << ".pProperties = ";
 
   ur::details::printPtr(os, *(params->ppProperties));
-
-  os << ", ";
-  os << ".numEventsInWaitList = ";
-
-  os << *(params->pnumEventsInWaitList);
-
-  os << ", ";
-  os << ".phEventWaitList = ";
-  ur::details::printPtr(
-      os, reinterpret_cast<const void *>(*(params->pphEventWaitList)));
-  if (*(params->pphEventWaitList) != NULL) {
-    os << " {";
-    for (size_t i = 0; i < *params->pnumEventsInWaitList; ++i) {
-      if (i != 0) {
-        os << ", ";
-      }
-
-      ur::details::printPtr(os, (*(params->pphEventWaitList))[i]);
-    }
-    os << "}";
-  }
-
-  os << ", ";
-  os << ".phEvent = ";
-
-  ur::details::printPtr(os, *(params->pphEvent));
-
-  return os;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-/// @brief Print operator for the ur_enqueue_command_buffer_exp_params_t type
-/// @returns
-///     std::ostream &
-inline std::ostream &
-operator<<(std::ostream &os,
-           [[maybe_unused]] const struct ur_enqueue_command_buffer_exp_params_t
-               *params) {
-
-  os << ".hQueue = ";
-
-  ur::details::printPtr(os, *(params->phQueue));
-
-  os << ", ";
-  os << ".hCommandBuffer = ";
-
-  ur::details::printPtr(os, *(params->phCommandBuffer));
 
   os << ", ";
   os << ".numEventsInWaitList = ";
@@ -23038,11 +23038,11 @@ inline ur_result_t UR_APICALL printFunctionParams(std::ostream &os,
   case UR_FUNCTION_ENQUEUE_HOST_TASK_EXP: {
     os << (const struct ur_enqueue_host_task_exp_params_t *)params;
   } break;
-  case UR_FUNCTION_ENQUEUE_NATIVE_COMMAND_EXP: {
-    os << (const struct ur_enqueue_native_command_exp_params_t *)params;
-  } break;
   case UR_FUNCTION_ENQUEUE_COMMAND_BUFFER_EXP: {
     os << (const struct ur_enqueue_command_buffer_exp_params_t *)params;
+  } break;
+  case UR_FUNCTION_ENQUEUE_NATIVE_COMMAND_EXP: {
+    os << (const struct ur_enqueue_native_command_exp_params_t *)params;
   } break;
   case UR_FUNCTION_ENQUEUE_GRAPH_EXP: {
     os << (const struct ur_enqueue_graph_exp_params_t *)params;

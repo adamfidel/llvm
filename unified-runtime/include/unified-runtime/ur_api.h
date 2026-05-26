@@ -11134,6 +11134,91 @@ UR_APIEXPORT ur_result_t UR_APICALL urEnqueueTimestampRecordingExp(
 #if !defined(__GNUC__)
 #pragma endregion
 #endif
+// Intel 'oneAPI' Unified Runtime Experimental API for host tasks
+#if !defined(__GNUC__)
+#pragma region host_task_(experimental)
+#endif
+///////////////////////////////////////////////////////////////////////////////
+/// @brief Host task flag properties
+typedef uint32_t ur_exp_host_task_flags_t;
+typedef enum ur_exp_host_task_flag_t {
+  /// reserved for future use.
+  UR_EXP_HOST_TASK_FLAG_TBD = UR_BIT(0),
+  /// @cond
+  UR_EXP_HOST_TASK_FLAG_FORCE_UINT32 = 0x7fffffff
+  /// @endcond
+
+} ur_exp_host_task_flag_t;
+/// @brief Bit Mask for validating ur_exp_host_task_flags_t
+#define UR_EXP_HOST_TASK_FLAGS_MASK 0xfffffffe
+
+///////////////////////////////////////////////////////////////////////////////
+/// @brief Host task properties
+typedef struct ur_exp_host_task_properties_t {
+  /// [in] type of this structure, must be
+  /// ::UR_STRUCTURE_TYPE_EXP_HOST_TASK_PROPERTIES
+  ur_structure_type_t stype;
+  /// [in,out][optional] pointer to extension-specific structure
+  void *pNext;
+  /// [in] host task flags
+  ur_exp_host_task_flags_t flags;
+
+} ur_exp_host_task_properties_t;
+
+///////////////////////////////////////////////////////////////////////////////
+/// @brief Host task function.
+typedef void (*ur_exp_host_task_function_t)(
+    /// [in] Host task callback function. Must not call any UR functions.
+    void *pfnHostTask);
+
+///////////////////////////////////////////////////////////////////////////////
+/// @brief Enqueue host task to be executed on the queue.
+///
+/// @returns
+///     - ::UR_RESULT_SUCCESS
+///     - ::UR_RESULT_ERROR_UNINITIALIZED
+///     - ::UR_RESULT_ERROR_DEVICE_LOST
+///     - ::UR_RESULT_ERROR_ADAPTER_SPECIFIC
+///     - ::UR_RESULT_ERROR_INVALID_NULL_HANDLE
+///         + `NULL == hQueue`
+///     - ::UR_RESULT_ERROR_INVALID_NULL_POINTER
+///         + `NULL == pfnHostTask`
+///     - ::UR_RESULT_ERROR_INVALID_ENUMERATION
+///         + `NULL != pProperties && ::UR_EXP_HOST_TASK_FLAGS_MASK &
+///         pProperties->flags`
+///     - ::UR_RESULT_ERROR_INVALID_EVENT_WAIT_LIST
+///         + `phEventWaitList == NULL && numEventsInWaitList > 0`
+///         + `phEventWaitList != NULL && numEventsInWaitList == 0`
+///         + If event objects in phEventWaitList are not valid events.
+///     - ::UR_RESULT_ERROR_UNSUPPORTED_FEATURE
+///         + If `zeCommandListAppendHostFunction` Level Zero API is not
+///         supported by the driver.
+UR_APIEXPORT ur_result_t UR_APICALL urEnqueueHostTaskExp(
+    /// [in] handle of the queue object
+    ur_queue_handle_t hQueue,
+    /// [in] Host task callback function. Must not call any UR functions.
+    ur_exp_host_task_function_t pfnHostTask,
+    /// [in][optional] data used by pfnHostTask
+    void *data,
+    /// [in][optional] pointer to the host task properties
+    const ur_exp_host_task_properties_t *pProperties,
+    /// [in] size of the event wait list
+    uint32_t numEventsInWaitList,
+    /// [in][optional][range(0, numEventsInWaitList)] pointer to a list of
+    /// events that must be complete before the kernel execution.
+    /// If nullptr, the numEventsInWaitList must be 0, indicating no wait
+    /// events.
+    const ur_event_handle_t *phEventWaitList,
+    /// [out][optional][alloc] return an event object that identifies the work
+    /// that has
+    /// been enqueued in nativeEnqueueFunc. If phEventWaitList and phEvent are
+    /// not NULL, phEvent must not refer to an element of the phEventWaitList
+    /// array.
+    ur_event_handle_t *phEvent);
+
+#if !defined(__GNUC__)
+#pragma endregion
+#endif
 // Intel 'oneAPI' Unified Runtime Experimental APIs for Inter Process
 // Communication
 #if !defined(__GNUC__)
@@ -11851,273 +11936,6 @@ UR_APIEXPORT ur_result_t UR_APICALL urUsmP2PPeerAccessGetInfoExp(
     /// [out][optional] pointer to the actual size in bytes of the queried
     /// propName.
     size_t *pPropSizeRet);
-
-#if !defined(__GNUC__)
-#pragma endregion
-#endif
-// Intel 'oneAPI' Unified Runtime Experimental API for host tasks
-#if !defined(__GNUC__)
-#pragma region host_task_(experimental)
-#endif
-///////////////////////////////////////////////////////////////////////////////
-/// @brief Host task flag properties
-typedef uint32_t ur_exp_host_task_flags_t;
-typedef enum ur_exp_host_task_flag_t {
-  /// reserved for future use.
-  UR_EXP_HOST_TASK_FLAG_TBD = UR_BIT(0),
-  /// @cond
-  UR_EXP_HOST_TASK_FLAG_FORCE_UINT32 = 0x7fffffff
-  /// @endcond
-
-} ur_exp_host_task_flag_t;
-/// @brief Bit Mask for validating ur_exp_host_task_flags_t
-#define UR_EXP_HOST_TASK_FLAGS_MASK 0xfffffffe
-
-///////////////////////////////////////////////////////////////////////////////
-/// @brief Host task properties
-typedef struct ur_exp_host_task_properties_t {
-  /// [in] type of this structure, must be
-  /// ::UR_STRUCTURE_TYPE_EXP_HOST_TASK_PROPERTIES
-  ur_structure_type_t stype;
-  /// [in,out][optional] pointer to extension-specific structure
-  void *pNext;
-  /// [in] host task flags
-  ur_exp_host_task_flags_t flags;
-
-} ur_exp_host_task_properties_t;
-
-///////////////////////////////////////////////////////////////////////////////
-/// @brief Host task function.
-typedef void (*ur_exp_host_task_function_t)(
-    /// [in] Host task callback function. Must not call any UR functions.
-    void *pfnHostTask);
-
-///////////////////////////////////////////////////////////////////////////////
-/// @brief Enqueue host task to be executed on the queue.
-///
-/// @returns
-///     - ::UR_RESULT_SUCCESS
-///     - ::UR_RESULT_ERROR_UNINITIALIZED
-///     - ::UR_RESULT_ERROR_DEVICE_LOST
-///     - ::UR_RESULT_ERROR_ADAPTER_SPECIFIC
-///     - ::UR_RESULT_ERROR_INVALID_NULL_HANDLE
-///         + `NULL == hQueue`
-///     - ::UR_RESULT_ERROR_INVALID_NULL_POINTER
-///         + `NULL == pfnHostTask`
-///     - ::UR_RESULT_ERROR_INVALID_ENUMERATION
-///         + `NULL != pProperties && ::UR_EXP_HOST_TASK_FLAGS_MASK &
-///         pProperties->flags`
-///     - ::UR_RESULT_ERROR_INVALID_EVENT_WAIT_LIST
-///         + `phEventWaitList == NULL && numEventsInWaitList > 0`
-///         + `phEventWaitList != NULL && numEventsInWaitList == 0`
-///         + If event objects in phEventWaitList are not valid events.
-///     - ::UR_RESULT_ERROR_UNSUPPORTED_FEATURE
-///         + If `zeCommandListAppendHostFunction` Level Zero API is not
-///         supported by the driver.
-UR_APIEXPORT ur_result_t UR_APICALL urEnqueueHostTaskExp(
-    /// [in] handle of the queue object
-    ur_queue_handle_t hQueue,
-    /// [in] Host task callback function. Must not call any UR functions.
-    ur_exp_host_task_function_t pfnHostTask,
-    /// [in][optional] data used by pfnHostTask
-    void *data,
-    /// [in][optional] pointer to the host task properties
-    const ur_exp_host_task_properties_t *pProperties,
-    /// [in] size of the event wait list
-    uint32_t numEventsInWaitList,
-    /// [in][optional][range(0, numEventsInWaitList)] pointer to a list of
-    /// events that must be complete before the kernel execution.
-    /// If nullptr, the numEventsInWaitList must be 0, indicating no wait
-    /// events.
-    const ur_event_handle_t *phEventWaitList,
-    /// [out][optional][alloc] return an event object that identifies the work
-    /// that has
-    /// been enqueued in nativeEnqueueFunc. If phEventWaitList and phEvent are
-    /// not NULL, phEvent must not refer to an element of the phEventWaitList
-    /// array.
-    ur_event_handle_t *phEvent);
-
-#if !defined(__GNUC__)
-#pragma endregion
-#endif
-// Intel 'oneAPI' Unified Runtime Experimental API for low-power events API
-#if !defined(__GNUC__)
-#pragma region low_power_events_(experimental)
-#endif
-///////////////////////////////////////////////////////////////////////////////
-/// @brief Extended enqueue properties
-typedef uint32_t ur_exp_enqueue_ext_flags_t;
-typedef enum ur_exp_enqueue_ext_flag_t {
-  /// Hint: use low-power events. Only meaningful for Level Zero, where the
-  /// implementation may use interrupt-driven events. May reduce CPU
-  /// utilization at the cost of increased event completion latency. Other
-  /// platforms may ignore this flag.
-  UR_EXP_ENQUEUE_EXT_FLAG_LOW_POWER_EVENTS_SUPPORT = UR_BIT(11),
-  /// @cond
-  UR_EXP_ENQUEUE_EXT_FLAG_FORCE_UINT32 = 0x7fffffff
-  /// @endcond
-
-} ur_exp_enqueue_ext_flag_t;
-/// @brief Bit Mask for validating ur_exp_enqueue_ext_flags_t
-#define UR_EXP_ENQUEUE_EXT_FLAGS_MASK 0xfffff7ff
-
-///////////////////////////////////////////////////////////////////////////////
-/// @brief Extended enqueue properties
-typedef struct ur_exp_enqueue_ext_properties_t {
-  /// [in] type of this structure, must be
-  /// ::UR_STRUCTURE_TYPE_EXP_ENQUEUE_EXT_PROPERTIES
-  ur_structure_type_t stype;
-  /// [in,out][optional] pointer to extension-specific structure
-  void *pNext;
-  /// [in] extended enqueue flags
-  ur_exp_enqueue_ext_flags_t flags;
-
-} ur_exp_enqueue_ext_properties_t;
-
-///////////////////////////////////////////////////////////////////////////////
-/// @brief Enqueue a barrier command which waits a list of events to complete
-///        before it completes, with optional extended properties
-///
-/// @details
-///     - If the event list is empty, it waits for all previously enqueued
-///       commands to complete.
-///     - It blocks command execution - any following commands enqueued after it
-///       do not execute until it completes.
-///     - It returns an event which can be waited on.
-///
-/// @remarks
-///   _Analogues_
-///     - **clEnqueueBarrierWithWaitList**
-///
-/// @returns
-///     - ::UR_RESULT_SUCCESS
-///     - ::UR_RESULT_ERROR_UNINITIALIZED
-///     - ::UR_RESULT_ERROR_DEVICE_LOST
-///     - ::UR_RESULT_ERROR_ADAPTER_SPECIFIC
-///     - ::UR_RESULT_ERROR_INVALID_NULL_HANDLE
-///         + `NULL == hQueue`
-///     - ::UR_RESULT_ERROR_INVALID_ENUMERATION
-///         + `NULL != pProperties && ::UR_EXP_ENQUEUE_EXT_FLAGS_MASK &
-///         pProperties->flags`
-///     - ::UR_RESULT_ERROR_INVALID_QUEUE
-///     - ::UR_RESULT_ERROR_INVALID_EVENT
-///     - ::UR_RESULT_ERROR_INVALID_EVENT_WAIT_LIST
-///         + `phEventWaitList == NULL && numEventsInWaitList > 0`
-///         + `phEventWaitList != NULL && numEventsInWaitList == 0`
-///         + If event objects in phEventWaitList are not valid events.
-///     - ::UR_RESULT_ERROR_IN_EVENT_LIST_EXEC_STATUS
-///         + An event in `phEventWaitList` has ::UR_EVENT_STATUS_ERROR.
-///     - ::UR_RESULT_ERROR_INVALID_VALUE
-///     - ::UR_RESULT_ERROR_OUT_OF_HOST_MEMORY
-///     - ::UR_RESULT_ERROR_OUT_OF_RESOURCES
-UR_APIEXPORT ur_result_t UR_APICALL urEnqueueEventsWaitWithBarrierExt(
-    /// [in] handle of the queue object
-    ur_queue_handle_t hQueue,
-    /// [in][optional] pointer to the extended enqueue properties
-    const ur_exp_enqueue_ext_properties_t *pProperties,
-    /// [in] size of the event wait list
-    uint32_t numEventsInWaitList,
-    /// [in][optional][range(0, numEventsInWaitList)] pointer to a list of
-    /// events that must be complete before this command can be executed.
-    /// If nullptr, the numEventsInWaitList must be 0, indicating that all
-    /// previously enqueued commands
-    /// must be complete.
-    const ur_event_handle_t *phEventWaitList,
-    /// [out][optional][alloc] return an event object that identifies this
-    /// particular command instance. If phEventWaitList and phEvent are not
-    /// NULL, phEvent must not refer to an element of the phEventWaitList array.
-    ur_event_handle_t *phEvent);
-
-#if !defined(__GNUC__)
-#pragma endregion
-#endif
-// Intel 'oneAPI' Unified Runtime Experimental API for enqueuing work through
-// native APIs
-#if !defined(__GNUC__)
-#pragma region native_enqueue_(experimental)
-#endif
-///////////////////////////////////////////////////////////////////////////////
-/// @brief Native enqueue properties
-typedef uint32_t ur_exp_enqueue_native_command_flags_t;
-typedef enum ur_exp_enqueue_native_command_flag_t {
-  /// reserved for future use.
-  UR_EXP_ENQUEUE_NATIVE_COMMAND_FLAG_TBD = UR_BIT(0),
-  /// @cond
-  UR_EXP_ENQUEUE_NATIVE_COMMAND_FLAG_FORCE_UINT32 = 0x7fffffff
-  /// @endcond
-
-} ur_exp_enqueue_native_command_flag_t;
-/// @brief Bit Mask for validating ur_exp_enqueue_native_command_flags_t
-#define UR_EXP_ENQUEUE_NATIVE_COMMAND_FLAGS_MASK 0xfffffffe
-
-///////////////////////////////////////////////////////////////////////////////
-/// @brief Native enqueue properties
-typedef struct ur_exp_enqueue_native_command_properties_t {
-  /// [in] type of this structure, must be
-  /// ::UR_STRUCTURE_TYPE_EXP_ENQUEUE_NATIVE_COMMAND_PROPERTIES
-  ur_structure_type_t stype;
-  /// [in,out][optional] pointer to extension-specific structure
-  void *pNext;
-  /// [in] native enqueue flags
-  ur_exp_enqueue_native_command_flags_t flags;
-
-} ur_exp_enqueue_native_command_properties_t;
-
-///////////////////////////////////////////////////////////////////////////////
-/// @brief Function enqueueing work through the native API to be executed
-///        immediately.
-typedef void (*ur_exp_enqueue_native_command_function_t)(
-    /// [in] handle of the queue object
-    ur_queue_handle_t hQueue,
-    /// [in][out] pointer to data to be passed to callback
-    void *pUserData);
-
-///////////////////////////////////////////////////////////////////////////////
-/// @brief Immediately enqueue work through a native backend API
-///
-/// @returns
-///     - ::UR_RESULT_SUCCESS
-///     - ::UR_RESULT_ERROR_UNINITIALIZED
-///     - ::UR_RESULT_ERROR_DEVICE_LOST
-///     - ::UR_RESULT_ERROR_ADAPTER_SPECIFIC
-///     - ::UR_RESULT_ERROR_INVALID_NULL_HANDLE
-///         + `NULL == hQueue`
-///     - ::UR_RESULT_ERROR_INVALID_NULL_POINTER
-///         + `NULL == pfnNativeEnqueue`
-///     - ::UR_RESULT_ERROR_INVALID_ENUMERATION
-///         + `NULL != pProperties && ::UR_EXP_ENQUEUE_NATIVE_COMMAND_FLAGS_MASK
-///         & pProperties->flags`
-///     - ::UR_RESULT_ERROR_INVALID_EVENT_WAIT_LIST
-UR_APIEXPORT ur_result_t UR_APICALL urEnqueueNativeCommandExp(
-    /// [in] handle of the queue object
-    ur_queue_handle_t hQueue,
-    /// [in] function calling the native underlying API, to be executed
-    /// immediately.
-    ur_exp_enqueue_native_command_function_t pfnNativeEnqueue,
-    /// [in][optional] data used by pfnNativeEnqueue
-    void *data,
-    /// [in] size of the mem list
-    uint32_t numMemsInMemList,
-    /// [in][optional][range(0, numMemsInMemList)] mems that are used within
-    /// pfnNativeEnqueue using ::urMemGetNativeHandle.
-    /// If nullptr, the numMemsInMemList must be 0, indicating that no mems
-    /// are accessed with ::urMemGetNativeHandle within pfnNativeEnqueue.
-    const ur_mem_handle_t *phMemList,
-    /// [in][optional] pointer to the native enqueue properties
-    const ur_exp_enqueue_native_command_properties_t *pProperties,
-    /// [in] size of the event wait list
-    uint32_t numEventsInWaitList,
-    /// [in][optional][range(0, numEventsInWaitList)] pointer to a list of
-    /// events that must be complete before the kernel execution.
-    /// If nullptr, the numEventsInWaitList must be 0, indicating no wait
-    /// events.
-    const ur_event_handle_t *phEventWaitList,
-    /// [out][optional][alloc] return an event object that identifies the work
-    /// that has
-    /// been enqueued in nativeEnqueueFunc. If phEventWaitList and phEvent are
-    /// not NULL, phEvent must not refer to an element of the phEventWaitList
-    /// array.
-    ur_event_handle_t *phEvent);
 
 #if !defined(__GNUC__)
 #pragma endregion
@@ -13705,6 +13523,188 @@ UR_APIEXPORT ur_result_t UR_APICALL urCommandBufferGetNativeHandleExp(
     ur_exp_command_buffer_handle_t hCommandBuffer,
     /// [out] A pointer to the native handle of the command-buffer.
     ur_native_handle_t *phNativeCommandBuffer);
+
+#if !defined(__GNUC__)
+#pragma endregion
+#endif
+// Intel 'oneAPI' Unified Runtime Experimental API for low-power events API
+#if !defined(__GNUC__)
+#pragma region low_power_events_(experimental)
+#endif
+///////////////////////////////////////////////////////////////////////////////
+/// @brief Extended enqueue properties
+typedef uint32_t ur_exp_enqueue_ext_flags_t;
+typedef enum ur_exp_enqueue_ext_flag_t {
+  /// Hint: use low-power events. Only meaningful for Level Zero, where the
+  /// implementation may use interrupt-driven events. May reduce CPU
+  /// utilization at the cost of increased event completion latency. Other
+  /// platforms may ignore this flag.
+  UR_EXP_ENQUEUE_EXT_FLAG_LOW_POWER_EVENTS_SUPPORT = UR_BIT(11),
+  /// @cond
+  UR_EXP_ENQUEUE_EXT_FLAG_FORCE_UINT32 = 0x7fffffff
+  /// @endcond
+
+} ur_exp_enqueue_ext_flag_t;
+/// @brief Bit Mask for validating ur_exp_enqueue_ext_flags_t
+#define UR_EXP_ENQUEUE_EXT_FLAGS_MASK 0xfffff7ff
+
+///////////////////////////////////////////////////////////////////////////////
+/// @brief Extended enqueue properties
+typedef struct ur_exp_enqueue_ext_properties_t {
+  /// [in] type of this structure, must be
+  /// ::UR_STRUCTURE_TYPE_EXP_ENQUEUE_EXT_PROPERTIES
+  ur_structure_type_t stype;
+  /// [in,out][optional] pointer to extension-specific structure
+  void *pNext;
+  /// [in] extended enqueue flags
+  ur_exp_enqueue_ext_flags_t flags;
+
+} ur_exp_enqueue_ext_properties_t;
+
+///////////////////////////////////////////////////////////////////////////////
+/// @brief Enqueue a barrier command which waits a list of events to complete
+///        before it completes, with optional extended properties
+///
+/// @details
+///     - If the event list is empty, it waits for all previously enqueued
+///       commands to complete.
+///     - It blocks command execution - any following commands enqueued after it
+///       do not execute until it completes.
+///     - It returns an event which can be waited on.
+///
+/// @remarks
+///   _Analogues_
+///     - **clEnqueueBarrierWithWaitList**
+///
+/// @returns
+///     - ::UR_RESULT_SUCCESS
+///     - ::UR_RESULT_ERROR_UNINITIALIZED
+///     - ::UR_RESULT_ERROR_DEVICE_LOST
+///     - ::UR_RESULT_ERROR_ADAPTER_SPECIFIC
+///     - ::UR_RESULT_ERROR_INVALID_NULL_HANDLE
+///         + `NULL == hQueue`
+///     - ::UR_RESULT_ERROR_INVALID_ENUMERATION
+///         + `NULL != pProperties && ::UR_EXP_ENQUEUE_EXT_FLAGS_MASK &
+///         pProperties->flags`
+///     - ::UR_RESULT_ERROR_INVALID_QUEUE
+///     - ::UR_RESULT_ERROR_INVALID_EVENT
+///     - ::UR_RESULT_ERROR_INVALID_EVENT_WAIT_LIST
+///         + `phEventWaitList == NULL && numEventsInWaitList > 0`
+///         + `phEventWaitList != NULL && numEventsInWaitList == 0`
+///         + If event objects in phEventWaitList are not valid events.
+///     - ::UR_RESULT_ERROR_IN_EVENT_LIST_EXEC_STATUS
+///         + An event in `phEventWaitList` has ::UR_EVENT_STATUS_ERROR.
+///     - ::UR_RESULT_ERROR_INVALID_VALUE
+///     - ::UR_RESULT_ERROR_OUT_OF_HOST_MEMORY
+///     - ::UR_RESULT_ERROR_OUT_OF_RESOURCES
+UR_APIEXPORT ur_result_t UR_APICALL urEnqueueEventsWaitWithBarrierExt(
+    /// [in] handle of the queue object
+    ur_queue_handle_t hQueue,
+    /// [in][optional] pointer to the extended enqueue properties
+    const ur_exp_enqueue_ext_properties_t *pProperties,
+    /// [in] size of the event wait list
+    uint32_t numEventsInWaitList,
+    /// [in][optional][range(0, numEventsInWaitList)] pointer to a list of
+    /// events that must be complete before this command can be executed.
+    /// If nullptr, the numEventsInWaitList must be 0, indicating that all
+    /// previously enqueued commands
+    /// must be complete.
+    const ur_event_handle_t *phEventWaitList,
+    /// [out][optional][alloc] return an event object that identifies this
+    /// particular command instance. If phEventWaitList and phEvent are not
+    /// NULL, phEvent must not refer to an element of the phEventWaitList array.
+    ur_event_handle_t *phEvent);
+
+#if !defined(__GNUC__)
+#pragma endregion
+#endif
+// Intel 'oneAPI' Unified Runtime Experimental API for enqueuing work through
+// native APIs
+#if !defined(__GNUC__)
+#pragma region native_enqueue_(experimental)
+#endif
+///////////////////////////////////////////////////////////////////////////////
+/// @brief Native enqueue properties
+typedef uint32_t ur_exp_enqueue_native_command_flags_t;
+typedef enum ur_exp_enqueue_native_command_flag_t {
+  /// reserved for future use.
+  UR_EXP_ENQUEUE_NATIVE_COMMAND_FLAG_TBD = UR_BIT(0),
+  /// @cond
+  UR_EXP_ENQUEUE_NATIVE_COMMAND_FLAG_FORCE_UINT32 = 0x7fffffff
+  /// @endcond
+
+} ur_exp_enqueue_native_command_flag_t;
+/// @brief Bit Mask for validating ur_exp_enqueue_native_command_flags_t
+#define UR_EXP_ENQUEUE_NATIVE_COMMAND_FLAGS_MASK 0xfffffffe
+
+///////////////////////////////////////////////////////////////////////////////
+/// @brief Native enqueue properties
+typedef struct ur_exp_enqueue_native_command_properties_t {
+  /// [in] type of this structure, must be
+  /// ::UR_STRUCTURE_TYPE_EXP_ENQUEUE_NATIVE_COMMAND_PROPERTIES
+  ur_structure_type_t stype;
+  /// [in,out][optional] pointer to extension-specific structure
+  void *pNext;
+  /// [in] native enqueue flags
+  ur_exp_enqueue_native_command_flags_t flags;
+
+} ur_exp_enqueue_native_command_properties_t;
+
+///////////////////////////////////////////////////////////////////////////////
+/// @brief Function enqueueing work through the native API to be executed
+///        immediately.
+typedef void (*ur_exp_enqueue_native_command_function_t)(
+    /// [in] handle of the queue object
+    ur_queue_handle_t hQueue,
+    /// [in][out] pointer to data to be passed to callback
+    void *pUserData);
+
+///////////////////////////////////////////////////////////////////////////////
+/// @brief Immediately enqueue work through a native backend API
+///
+/// @returns
+///     - ::UR_RESULT_SUCCESS
+///     - ::UR_RESULT_ERROR_UNINITIALIZED
+///     - ::UR_RESULT_ERROR_DEVICE_LOST
+///     - ::UR_RESULT_ERROR_ADAPTER_SPECIFIC
+///     - ::UR_RESULT_ERROR_INVALID_NULL_HANDLE
+///         + `NULL == hQueue`
+///     - ::UR_RESULT_ERROR_INVALID_NULL_POINTER
+///         + `NULL == pfnNativeEnqueue`
+///     - ::UR_RESULT_ERROR_INVALID_ENUMERATION
+///         + `NULL != pProperties && ::UR_EXP_ENQUEUE_NATIVE_COMMAND_FLAGS_MASK
+///         & pProperties->flags`
+///     - ::UR_RESULT_ERROR_INVALID_EVENT_WAIT_LIST
+UR_APIEXPORT ur_result_t UR_APICALL urEnqueueNativeCommandExp(
+    /// [in] handle of the queue object
+    ur_queue_handle_t hQueue,
+    /// [in] function calling the native underlying API, to be executed
+    /// immediately.
+    ur_exp_enqueue_native_command_function_t pfnNativeEnqueue,
+    /// [in][optional] data used by pfnNativeEnqueue
+    void *data,
+    /// [in] size of the mem list
+    uint32_t numMemsInMemList,
+    /// [in][optional][range(0, numMemsInMemList)] mems that are used within
+    /// pfnNativeEnqueue using ::urMemGetNativeHandle.
+    /// If nullptr, the numMemsInMemList must be 0, indicating that no mems
+    /// are accessed with ::urMemGetNativeHandle within pfnNativeEnqueue.
+    const ur_mem_handle_t *phMemList,
+    /// [in][optional] pointer to the native enqueue properties
+    const ur_exp_enqueue_native_command_properties_t *pProperties,
+    /// [in] size of the event wait list
+    uint32_t numEventsInWaitList,
+    /// [in][optional][range(0, numEventsInWaitList)] pointer to a list of
+    /// events that must be complete before the kernel execution.
+    /// If nullptr, the numEventsInWaitList must be 0, indicating no wait
+    /// events.
+    const ur_event_handle_t *phEventWaitList,
+    /// [out][optional][alloc] return an event object that identifies the work
+    /// that has
+    /// been enqueued in nativeEnqueueFunc. If phEventWaitList and phEvent are
+    /// not NULL, phEvent must not refer to an element of the phEventWaitList
+    /// array.
+    ur_event_handle_t *phEvent);
 
 #if !defined(__GNUC__)
 #pragma endregion
@@ -15484,6 +15484,18 @@ typedef struct ur_enqueue_host_task_exp_params_t {
 } ur_enqueue_host_task_exp_params_t;
 
 ///////////////////////////////////////////////////////////////////////////////
+/// @brief Function parameters for urEnqueueCommandBufferExp
+/// @details Each entry is a pointer to the parameter passed to the function;
+///     allowing the callback the ability to modify the parameter's value
+typedef struct ur_enqueue_command_buffer_exp_params_t {
+  ur_queue_handle_t *phQueue;
+  ur_exp_command_buffer_handle_t *phCommandBuffer;
+  uint32_t *pnumEventsInWaitList;
+  const ur_event_handle_t **pphEventWaitList;
+  ur_event_handle_t **pphEvent;
+} ur_enqueue_command_buffer_exp_params_t;
+
+///////////////////////////////////////////////////////////////////////////////
 /// @brief Function parameters for urEnqueueNativeCommandExp
 /// @details Each entry is a pointer to the parameter passed to the function;
 ///     allowing the callback the ability to modify the parameter's value
@@ -15498,18 +15510,6 @@ typedef struct ur_enqueue_native_command_exp_params_t {
   const ur_event_handle_t **pphEventWaitList;
   ur_event_handle_t **pphEvent;
 } ur_enqueue_native_command_exp_params_t;
-
-///////////////////////////////////////////////////////////////////////////////
-/// @brief Function parameters for urEnqueueCommandBufferExp
-/// @details Each entry is a pointer to the parameter passed to the function;
-///     allowing the callback the ability to modify the parameter's value
-typedef struct ur_enqueue_command_buffer_exp_params_t {
-  ur_queue_handle_t *phQueue;
-  ur_exp_command_buffer_handle_t *phCommandBuffer;
-  uint32_t *pnumEventsInWaitList;
-  const ur_event_handle_t **pphEventWaitList;
-  ur_event_handle_t **pphEvent;
-} ur_enqueue_command_buffer_exp_params_t;
 
 ///////////////////////////////////////////////////////////////////////////////
 /// @brief Function parameters for urEnqueueGraphExp

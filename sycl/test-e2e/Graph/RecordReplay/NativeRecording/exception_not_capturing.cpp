@@ -1,8 +1,8 @@
 // REQUIRES: level_zero_v2_adapter && arch-intel_gpu_bmg_g21
 
-// The native recording path can only report the spec-mandated errc::invalid
-// once the underlying runtime exposes the granular graph capture error codes.
-// Remove this XFAIL when that support lands.
+// The spec-mandated errc::invalid is only reported once the underlying runtime
+// exposes the granular graph capture error codes. Remove this XFAIL when that
+// support lands.
 // XFAIL: level_zero_v2_adapter
 
 // RUN: %{build} -o %t.out
@@ -12,4 +12,4 @@
 
 #define GRAPH_E2E_NATIVE_RECORDING
 
-#include "../../Inputs/exception_recording_queue_wait.cpp"
+#include "../Inputs/exception_not_capturing.cpp"

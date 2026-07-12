@@ -961,6 +961,19 @@ typedef enum ur_result_t {
   UR_RESULT_ERROR_INVALID_SPEC_ID = 70,
   /// A graph object is not valid.
   UR_RESULT_ERROR_INVALID_GRAPH = 71,
+  /// An operation is not supported while a graph is being recorded.
+  UR_RESULT_ERROR_GRAPH_CAPTURE_UNSUPPORTED = 72,
+  /// The active graph recording has been invalidated.
+  UR_RESULT_ERROR_GRAPH_CAPTURE_INVALIDATED = 73,
+  /// An illegal attempt was made to merge two graph recordings.
+  UR_RESULT_ERROR_GRAPH_CAPTURE_MERGE_ATTEMPT = 74,
+  /// An end/append operation was requested while no graph recording is active.
+  UR_RESULT_ERROR_COMMAND_LIST_NOT_CAPTURING = 75,
+  /// A graph recording has forked branches that were not rejoined before
+  /// ending.
+  UR_RESULT_ERROR_GRAPH_UNJOINED_FORKS = 76,
+  /// An event internal to a graph was used outside of that graph.
+  UR_RESULT_ERROR_GRAPH_INTERNAL_EVENT = 77,
   /// Invalid Command-Buffer
   UR_RESULT_ERROR_INVALID_COMMAND_BUFFER_EXP = 0x1000,
   /// Sync point is not valid for the command-buffer

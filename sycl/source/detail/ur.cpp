@@ -522,6 +522,18 @@ const char *stringifyErrorCode(int32_t error) {
     _UR_ERRC(UR_RESULT_ERROR_INVALID_COMMAND_BUFFER_SYNC_POINT_EXP)
     _UR_ERRC(UR_RESULT_ERROR_INVALID_COMMAND_BUFFER_SYNC_POINT_WAIT_LIST_EXP)
     _UR_ERRC(UR_RESULT_ERROR_INVALID_COMMAND_BUFFER_COMMAND_HANDLE_EXP)
+    _UR_ERRC_WITH_MSG(
+        UR_RESULT_ERROR_GRAPH_CAPTURE_UNSUPPORTED,
+        "operation is not supported while a graph is being recorded")
+    _UR_ERRC(UR_RESULT_ERROR_GRAPH_CAPTURE_INVALIDATED)
+    _UR_ERRC_WITH_MSG(UR_RESULT_ERROR_GRAPH_CAPTURE_MERGE_ATTEMPT,
+                      "illegal attempt to merge two graph recordings")
+    _UR_ERRC_WITH_MSG(UR_RESULT_ERROR_COMMAND_LIST_NOT_CAPTURING,
+                      "queue is not currently recording to a graph")
+    _UR_ERRC_WITH_MSG(UR_RESULT_ERROR_GRAPH_UNJOINED_FORKS,
+                      "graph recording has forked branches that were not "
+                      "rejoined before end_recording")
+    _UR_ERRC(UR_RESULT_ERROR_GRAPH_INTERNAL_EVENT)
     _UR_ERRC(UR_RESULT_ERROR_UNKNOWN)
 #undef _UR_ERRC
 #undef _UR_ERRC_WITH_MSG

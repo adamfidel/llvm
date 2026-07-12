@@ -285,6 +285,18 @@ etors:
       desc: "A specialization constant identifier is not valid."
     - name: ERROR_INVALID_GRAPH
       desc: "A graph object is not valid."
+    - name: ERROR_GRAPH_CAPTURE_UNSUPPORTED
+      desc: "An operation is not supported while a graph is being recorded."
+    - name: ERROR_GRAPH_CAPTURE_INVALIDATED
+      desc: "The active graph recording has been invalidated."
+    - name: ERROR_GRAPH_CAPTURE_MERGE_ATTEMPT
+      desc: "An illegal attempt was made to merge two graph recordings."
+    - name: ERROR_COMMAND_LIST_NOT_CAPTURING
+      desc: "An end/append operation was requested while no graph recording is active."
+    - name: ERROR_GRAPH_UNJOINED_FORKS
+      desc: "A graph recording has forked branches that were not rejoined before ending."
+    - name: ERROR_GRAPH_INTERNAL_EVENT
+      desc: "An event internal to a graph was used outside of that graph."
     - name: ERROR_UNKNOWN
       value: "0x7ffffffe"
       desc: "Unknown or internal error"

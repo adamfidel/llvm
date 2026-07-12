@@ -465,6 +465,19 @@ void handleErrorOrWarning(ur_result_t Error, const device_impl &DeviceImpl,
   case UR_RESULT_ERROR_INVALID_VALUE:
     return handleInvalidValue(DeviceImpl, NDRDesc);
 
+  case UR_RESULT_ERROR_GRAPH_CAPTURE_UNSUPPORTED:
+    throw detail::set_ur_error(
+        sycl::exception(make_error_code(errc::invalid),
+                        "operation is not supported while a graph is being "
+                        "recorded"),
+        UR_RESULT_ERROR_GRAPH_CAPTURE_UNSUPPORTED);
+
+  case UR_RESULT_ERROR_GRAPH_CAPTURE_MERGE_ATTEMPT:
+    throw detail::set_ur_error(
+        sycl::exception(make_error_code(errc::invalid),
+                        "illegal attempt to merge two graph recordings"),
+        UR_RESULT_ERROR_GRAPH_CAPTURE_MERGE_ATTEMPT);
+
   case UR_RESULT_ERROR_ADAPTER_SPECIFIC:
     // checkUrResult does all the necessary handling for
     // UR_RESULT_ERROR_ADAPTER_SPECIFIC_ERROR, making sure an error is thrown or

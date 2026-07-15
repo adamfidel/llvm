@@ -478,6 +478,14 @@ void handleErrorOrWarning(ur_result_t Error, const device_impl &DeviceImpl,
                         "illegal attempt to merge two graph recordings"),
         UR_RESULT_ERROR_GRAPH_CAPTURE_MERGE_ATTEMPT);
 
+  case UR_RESULT_ERROR_GRAPH_INTERNAL_EVENT:
+    throw detail::set_ur_error(
+        sycl::exception(make_error_code(errc::invalid),
+                        "an event internal to a graph recording was used "
+                        "outside of that graph, or an event external to the "
+                        "graph was used during recording"),
+        UR_RESULT_ERROR_GRAPH_INTERNAL_EVENT);
+
   case UR_RESULT_ERROR_ADAPTER_SPECIFIC:
     // checkUrResult does all the necessary handling for
     // UR_RESULT_ERROR_ADAPTER_SPECIFIC_ERROR, making sure an error is thrown or

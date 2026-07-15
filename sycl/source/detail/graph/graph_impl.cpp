@@ -97,7 +97,7 @@ inline const char *nodeTypeToString(node_type NodeType) {
   default:
     throw sycl::detail::set_ur_error(
         sycl::exception(sycl::make_error_code(errc::runtime),
-                        "Failed to end native UR graph capture"),
+                        "failed to end native UR graph capture"),
         Result);
   }
 }
@@ -944,7 +944,7 @@ void graph_impl::beginRecordingImpl(sycl::detail::queue_impl &Queue,
         }
         throw sycl::detail::set_ur_error(
             sycl::exception(sycl::make_error_code(errc::runtime),
-                            "Failed to begin native UR graph capture"),
+                            "failed to begin native UR graph capture"),
             Result);
       }
     } else {
@@ -1207,8 +1207,11 @@ exec_graph_impl::exec_graph_impl(sycl::context Context,
                 GraphImpl->getNativeGraphHandle(),
                 &MNativeExecutableGraphHandle);
     if (Result != UR_RESULT_SUCCESS) {
-      throw sycl::exception(sycl::make_error_code(errc::runtime),
-                            "Failed to instantiate native UR executable graph");
+      throw sycl::detail::set_ur_error(
+          sycl::exception(sycl::make_error_code(errc::runtime),
+                          "failed to instantiate native UR executable graph: " +
+                              sycl::detail::codeToString(Result)),
+          Result);
     }
   } else {
     // Copy nodes from GraphImpl and merge any subgraph nodes into this graph.

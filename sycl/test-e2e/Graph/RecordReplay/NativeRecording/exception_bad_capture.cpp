@@ -1,8 +1,8 @@
 // REQUIRES: level_zero_v2_adapter && arch-intel_gpu_bmg_g21
 
-// The spec-mandated errc::invalid is only reported once the underlying runtime
-// exposes the granular graph capture error codes. Remove this XFAIL when that
-// support lands.
+// The error is only reported once the underlying runtime detects and rejects
+// the unsupported operation during capture. Remove this XFAIL when that support
+// lands.
 // XFAIL: level_zero_v2_adapter
 
 // RUN: %{build} -o %t.out
@@ -11,7 +11,7 @@
 // RUN: %if level_zero %{%{l0_leak_check} %{run} %t.out 2>&1 | FileCheck %s --implicit-check-not=LEAK %}
 
 // Tests that an operation which cannot be captured while a graph is being
-// recorded throws errc::invalid. Exercises the UR
+// recorded throws errc::runtime. Exercises the UR
 // UR_RESULT_ERROR_GRAPH_CAPTURE_UNSUPPORTED path handled when appending a
 // command to the in-progress capture.
 //
@@ -42,7 +42,7 @@ int main() {
             Queue.parallel_for(sycl::range<1>{N},
                                [=](sycl::id<1> Idx) { Data[Idx] = Idx; });
           },
-          "unsupported operation during graph recording", errc::invalid)) {
+          "unsupported operation during graph recording", errc::runtime)) {
     Graph.end_recording(Queue);
     free(Data, Queue);
     return 1;

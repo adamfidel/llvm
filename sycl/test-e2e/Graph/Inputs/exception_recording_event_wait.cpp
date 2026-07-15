@@ -13,8 +13,13 @@ int main() {
       Queue.get_context(),
       Queue.get_device(),
       {exp_ext::property::graph::enable_native_recording{}}};
+  // In native recording the error originates in the runtime and is reported as
+  // errc::runtime, whereas traditional recording rejects the wait at the SYCL
+  // level with errc::invalid.
+  constexpr errc ExpectedCode = errc::runtime;
 #else
   exp_ext::command_graph Graph{Queue.get_context(), Queue.get_device()};
+  constexpr errc ExpectedCode = errc::invalid;
 #endif
 
   Graph.begin_recording(Queue);
@@ -22,7 +27,7 @@ int main() {
   auto GraphEvent = Queue.single_task([]() {});
 
   if (!expectException([&]() { GraphEvent.wait(); },
-                       "event wait during graph recording", errc::invalid)) {
+                       "event wait during graph recording", ExpectedCode)) {
     return 1;
   }
 

@@ -1,8 +1,7 @@
 // REQUIRES: level_zero_v2_adapter && arch-intel_gpu_bmg_g21
 
-// The spec-mandated errc::invalid is only reported once the underlying runtime
-// exposes the granular graph capture error codes. Remove this XFAIL when that
-// support lands.
+// The error is only reported once the underlying runtime detects and rejects
+// the illegal merge during capture. Remove this XFAIL when that support lands.
 // XFAIL: level_zero_v2_adapter
 
 // RUN: %{build} -o %t.out
@@ -11,7 +10,7 @@
 // RUN: %if level_zero %{%{l0_leak_check} %{run} %t.out 2>&1 | FileCheck %s --implicit-check-not=LEAK %}
 
 // Tests that an illegal attempt to merge two graph recordings throws
-// errc::invalid. Exercises the UR UR_RESULT_ERROR_GRAPH_CAPTURE_MERGE_ATTEMPT
+// errc::runtime. Exercises the UR UR_RESULT_ERROR_GRAPH_CAPTURE_MERGE_ATTEMPT
 // path handled on the command-buffer append call.
 //
 // A merge attempt arises when work already being captured by one graph is
@@ -54,7 +53,7 @@ int main() {
                                [=](sycl::id<1> Idx) { Data[Idx] += 1; });
             });
           },
-          "merging two graph recordings", errc::invalid)) {
+          "merging two graph recordings", errc::runtime)) {
     GraphA.end_recording(QueueA);
     GraphB.end_recording(QueueB);
     free(Data, QueueA);

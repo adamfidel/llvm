@@ -1,8 +1,8 @@
 // REQUIRES: level_zero_v2_adapter && arch-intel_gpu_bmg_g21
 
-// The spec-mandated errc::invalid is only reported once the underlying runtime
-// exposes the granular graph capture error codes. Remove this XFAIL when that
-// support lands.
+// The error is only reported once the underlying runtime detects and rejects
+// the unjoined forks at end of capture. Remove this XFAIL when that support
+// lands.
 // XFAIL: level_zero_v2_adapter
 
 // RUN: %{build} -o %t.out
@@ -11,7 +11,7 @@
 // RUN: %if level_zero %{%{l0_leak_check} %{run} %t.out 2>&1 | FileCheck %s --implicit-check-not=LEAK %}
 
 // Tests that ending a recording with forked branches that were not rejoined
-// throws errc::invalid. Exercises the UR UR_RESULT_ERROR_GRAPH_UNJOINED_FORKS
+// throws errc::runtime. Exercises the UR UR_RESULT_ERROR_GRAPH_UNJOINED_FORKS
 // path handled on the end-capture call.
 //
 // A fork is created when work branches off the recorded stream without being
@@ -47,7 +47,7 @@ int main() {
   });
 
   if (!expectException([&]() { Graph.end_recording(Queue); },
-                       "end_recording with unjoined forks", errc::invalid)) {
+                       "end_recording with unjoined forks", errc::runtime)) {
     free(Data, Queue);
     return 1;
   }

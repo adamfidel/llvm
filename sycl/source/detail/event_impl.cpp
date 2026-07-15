@@ -62,13 +62,7 @@ void event_impl::waitInternal(bool *Success) {
         (Err == UR_RESULT_ERROR_UNKNOWN ||
          Err == UR_RESULT_ERROR_IN_EVENT_LIST_EXEC_STATUS))
       *Success = false;
-    else if (Err == UR_RESULT_ERROR_GRAPH_INTERNAL_EVENT) {
-      throw sycl::detail::set_ur_error(
-          sycl::exception(make_error_code(errc::invalid),
-                          "an event internal to a graph recording cannot be "
-                          "waited on outside of that graph"),
-          Err);
-    } else {
+    else {
       getAdapter().checkUrResult(Err);
       if (Success != nullptr)
         *Success = true;

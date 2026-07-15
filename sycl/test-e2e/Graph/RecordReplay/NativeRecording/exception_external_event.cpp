@@ -1,8 +1,7 @@
 // REQUIRES: level_zero_v2_adapter && arch-intel_gpu_bmg_g21
 
-// The spec-mandated errc::invalid is only reported once the underlying runtime
-// exposes the granular graph capture error codes. Remove this XFAIL when that
-// support lands.
+// The error is only reported once the underlying runtime detects and rejects
+// the cross-boundary event use. Remove this XFAIL when that support lands.
 // XFAIL: level_zero_v2_adapter
 
 // RUN: %{build} -o %t.out
@@ -11,7 +10,7 @@
 // RUN: %if level_zero %{%{l0_leak_check} %{run} %t.out 2>&1 | FileCheck %s --implicit-check-not=LEAK %}
 
 // Tests that mixing events across a graph recording boundary throws
-// errc::invalid. Exercises the UR UR_RESULT_ERROR_GRAPH_INTERNAL_EVENT path in
+// errc::runtime. Exercises the UR UR_RESULT_ERROR_GRAPH_INTERNAL_EVENT path in
 // two directions:
 //   1. An event produced before begin_recording that is waited on while a
 //      graph is being recorded (external event pulled into the graph).
@@ -35,10 +34,10 @@ int main() {
 
   Graph.begin_recording(Queue);
 
-  // Waiting on an external event during recording is invalid.
+  // Waiting on an external event during recording fails in the runtime.
   if (!expectException([&]() { ExternalEvent.wait(); },
                        "external event wait during graph recording",
-                       errc::invalid)) {
+                       errc::runtime)) {
     Graph.end_recording();
     return 1;
   }
@@ -48,10 +47,11 @@ int main() {
 
   Graph.end_recording();
 
-  // Waiting on an internal graph event outside of the graph is invalid.
+  // Waiting on an internal graph event outside of the graph fails in the
+  // runtime.
   if (!expectException([&]() { InternalEvent.wait(); },
                        "internal graph event wait outside graph recording",
-                       errc::invalid)) {
+                       errc::runtime)) {
     return 1;
   }
 

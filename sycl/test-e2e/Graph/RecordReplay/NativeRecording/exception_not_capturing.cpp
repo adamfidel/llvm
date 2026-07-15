@@ -1,8 +1,7 @@
 // REQUIRES: level_zero_v2_adapter && arch-intel_gpu_bmg_g21
 
-// The spec-mandated errc::invalid is only reported once the underlying runtime
-// exposes the granular graph capture error codes. Remove this XFAIL when that
-// support lands.
+// The error is only reported once the underlying runtime detects and rejects
+// ending a non-capturing recording. Remove this XFAIL when that support lands.
 // XFAIL: level_zero_v2_adapter
 
 // RUN: %{build} -o %t.out
@@ -11,7 +10,7 @@
 // RUN: %if level_zero %{%{l0_leak_check} %{run} %t.out 2>&1 | FileCheck %s --implicit-check-not=LEAK %}
 
 // Tests that ending a recording on a queue that is not currently capturing to
-// the graph throws errc::invalid. Exercises the UR
+// the graph throws errc::runtime. Exercises the UR
 // UR_RESULT_ERROR_COMMAND_LIST_NOT_CAPTURING path.
 
 #include "../../graph_common.hpp"
@@ -27,10 +26,10 @@ int main() {
       {exp_ext::property::graph::enable_native_recording{}}};
 
   // The queue was never put into recording mode for this graph, so ending the
-  // recording is invalid.
+  // recording fails in the runtime.
   if (!expectException([&]() { Graph.end_recording(Queue); },
                        "end_recording on a non-recording queue",
-                       errc::invalid)) {
+                       errc::runtime)) {
     return 1;
   }
 

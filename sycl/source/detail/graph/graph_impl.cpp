@@ -77,31 +77,6 @@ inline const char *nodeTypeToString(node_type NodeType) {
   return {};
 }
 
-/// Translates a failing `urQueueEndGraphCaptureExp` result into a SYCL
-/// exception. Recording-specific UR codes are mapped to the spec-mandated
-/// `errc::invalid` with a descriptive message; anything else falls back to a
-/// generic `errc::runtime` error.
-[[noreturn]] void throwEndCaptureError(ur_result_t Result) {
-  switch (Result) {
-  case UR_RESULT_ERROR_COMMAND_LIST_NOT_CAPTURING:
-    throw sycl::detail::set_ur_error(
-        sycl::exception(sycl::make_error_code(errc::invalid),
-                        "queue is not currently recording to a graph"),
-        Result);
-  case UR_RESULT_ERROR_GRAPH_UNJOINED_FORKS:
-    throw sycl::detail::set_ur_error(
-        sycl::exception(sycl::make_error_code(errc::invalid),
-                        "graph recording has forked branches that were not "
-                        "rejoined before end_recording"),
-        Result);
-  default:
-    throw sycl::detail::set_ur_error(
-        sycl::exception(sycl::make_error_code(errc::runtime),
-                        "failed to end native UR graph capture"),
-        Result);
-  }
-}
-
 /// Topologically sorts the graph in order to schedule nodes for execution.
 /// This implementation is based on Kahn's algorithm which uses a Breadth-first
 /// search approach.
@@ -760,7 +735,11 @@ void graph_impl::clearQueues(bool NeedsLock) {
             sycl::detail::UrApiKind::urQueueEndGraphCaptureExp>(UrQueue,
                                                                 &CapturedGraph);
         if (Result != UR_RESULT_SUCCESS) {
-          throwEndCaptureError(Result);
+          throw sycl::detail::set_ur_error(
+              sycl::exception(sycl::make_error_code(errc::runtime),
+                              "failed to end native UR graph capture: " +
+                                  sycl::detail::codeToString(Result)),
+              Result);
         }
         // CapturedGraph should be the same as MNativeGraphHandle
       } else {
@@ -935,16 +914,10 @@ void graph_impl::beginRecordingImpl(sycl::detail::queue_impl &Queue,
           sycl::detail::UrApiKind::urQueueBeginCaptureIntoGraphExp>(
           UrQueue, MNativeGraphHandle);
       if (Result != UR_RESULT_SUCCESS) {
-        if (Result == UR_RESULT_ERROR_GRAPH_CAPTURE_UNSUPPORTED) {
-          throw sycl::detail::set_ur_error(
-              sycl::exception(sycl::make_error_code(errc::invalid),
-                              "operation is not supported while a graph is "
-                              "being recorded"),
-              Result);
-        }
         throw sycl::detail::set_ur_error(
             sycl::exception(sycl::make_error_code(errc::runtime),
-                            "failed to begin native UR graph capture"),
+                            "failed to begin native UR graph capture: " +
+                                sycl::detail::codeToString(Result)),
             Result);
       }
     } else {
@@ -2356,7 +2329,11 @@ void modifiable_command_graph::end_recording(queue &RecordingQueue) {
               .call_nocheck<sycl::detail::UrApiKind::urQueueEndGraphCaptureExp>(
                   UrQueue, &CapturedGraph);
       if (Result != UR_RESULT_SUCCESS) {
-        throwEndCaptureError(Result);
+        throw sycl::detail::set_ur_error(
+            sycl::exception(sycl::make_error_code(errc::runtime),
+                            "failed to end native UR graph capture: " +
+                                sycl::detail::codeToString(Result)),
+            Result);
       }
       assert(CapturedGraph == impl->getNativeGraphHandle() &&
              "Captured graph handle must match the graph's native handle");

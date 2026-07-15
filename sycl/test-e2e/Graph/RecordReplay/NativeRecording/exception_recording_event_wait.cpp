@@ -4,11 +4,6 @@
 
 // TODO: Add minimum Windows driver version once available
 
-// The native recording path can only report the spec-mandated errc::invalid
-// once the underlying runtime exposes the granular graph capture error codes.
-// Remove this XFAIL when that support lands.
-// XFAIL: level_zero_v2_adapter
-
 // RUN: %{build} -o %t.out
 // RUN: %{run} %t.out
 // Extra run to check for leaks in Level Zero using UR_L0_LEAKS_DEBUG

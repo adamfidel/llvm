@@ -11,9 +11,6 @@
 // RUN: %if level_zero %{%{l0_leak_check} %{run} %t.out 2>&1 | FileCheck %s --implicit-check-not=LEAK %}
 
 // Tests fork/join of a restricted host_task (submit_with_event + handler path)
-// across three in-order queues in a native-recording SYCL Graph. Exercises the
-// host task consuming a dependency event and producing a signal event, a host
-// task with no dependencies, and a join waiting on multiple events.
 
 #define GRAPH_E2E_NATIVE_RECORDING
 

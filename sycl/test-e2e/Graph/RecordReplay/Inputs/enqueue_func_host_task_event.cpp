@@ -35,7 +35,6 @@ int main() {
   Graph.begin_recording(Queue1);
   verifier.verify(RECORDING, EXECUTING, EXECUTING);
 
-  // Host task with no dependencies.
   syclex::submit_with_event(Queue1, [&](handler &CGH) {
     syclex::host_task(CGH, [=] {
       for (size_t i = 0; i < N; i++)
@@ -57,9 +56,8 @@ int main() {
     });
   });
 
-  // Q2 and Q3 run concurrently, so they operate on disjoint halves. Both add
-  // the same value so final validation is uniform across all elements.
-  // Q2 fork: kernel on the first half (host-task -> kernel dependency).
+  // Q2 and Q3 run concurrently, so they operate on disjoint halves.
+  // Q2 fork: kernel on the first half.
   auto Q2Event = syclex::submit_with_event(Queue2, [&](handler &CGH) {
     CGH.depends_on(ForkEvent);
     CGH.parallel_for(range<1>{N / 2}, [=](id<1> idx) { Data[idx] += 10; });
@@ -76,8 +74,7 @@ int main() {
   });
   verifier.verify(RECORDING, RECORDING, RECORDING);
 
-  // Join: host task waits on events from two distinct queues (multi-entry
-  // wait list, neither filtered by the in-order redundant-event optimization).
+  // Join: host task waits on events from two distinct queues
   syclex::submit_with_event(Queue1, [&](handler &CGH) {
     CGH.depends_on({Q2Event, Q3Event});
     syclex::host_task(CGH, [=] {

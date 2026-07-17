@@ -383,6 +383,26 @@ getNativeGraphImpl(queue_impl &Queue) {
   return Queue.getContextImpl().getNativeGraph(UrGraphHandle);
 }
 
+// When submitting a host task we must observe both the current queue's state
+// along with the worker queue's of any dependent events to determine if one
+// will transition the current command to native recording.
+static std::shared_ptr<queue_impl>
+getNativeRecordingQueue(queue_impl &Queue,
+                        const std::vector<EventImplPtr> &Events) {
+  if (Queue.isNativeRecording())
+    return Queue.shared_from_this();
+  for (const EventImplPtr &Event : Events) {
+    if (!Event)
+      continue;
+    auto DepQueue = Event->getWorkerQueue();
+    if (!DepQueue)
+      DepQueue = Event->getSubmittedQueue();
+    if (DepQueue && DepQueue->isNativeRecording())
+      return DepQueue;
+  }
+  return nullptr;
+}
+
 } // namespace detail
 
 handler::handler(detail::handler_impl &HandlerImpl) : impl(&HandlerImpl) {}
@@ -783,8 +803,14 @@ detail::EventImplPtr handler::finalize() {
   assert(Queue);
 
   // Host tasks in native recording mode are captured into the native graph
-  // rather than submitted to the scheduler.
-  if (type == detail::CGType::CodeplayHostTask && Queue->isNativeRecording()) {
+  // rather than submitted to the scheduler. The submitting queue may already be
+  // recording, or it may join an in-progress capture by depending on an event
+  // from a recording queue (a fork).
+  std::shared_ptr<detail::queue_impl> RecordingQueue;
+  if (type == detail::CGType::CodeplayHostTask)
+    RecordingQueue =
+        detail::getNativeRecordingQueue(*Queue, CommandGroup->getEvents());
+  if (RecordingQueue) {
     auto *HT = static_cast<detail::CGHostTask *>(CommandGroup.get());
     if (!HT->MHostTask->isCreatedFromEnqueueFunction()) {
       throw sycl::exception(make_error_code(errc::feature_not_supported),
@@ -800,7 +826,10 @@ detail::EventImplPtr handler::finalize() {
                             "not available on this device.");
     }
 
-    auto GraphImpl = detail::getNativeGraphImpl(*Queue);
+    // The native graph is sourced from the recording queue. When forking into a
+    // capture this is a dependency's queue rather than the submitting queue,
+    // which is not recording yet (it joins by this enqueue).
+    auto GraphImpl = detail::getNativeGraphImpl(*RecordingQueue);
     assert(GraphImpl && "Native graph handle expired while recording");
 
     // Store callback in the graph to manage its lifetime

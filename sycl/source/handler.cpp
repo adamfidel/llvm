@@ -808,32 +808,20 @@ detail::EventImplPtr handler::finalize() {
         std::make_unique<detail::EnqueueHostTaskData>(
             detail::HandlerAccess::getHostTaskFunc(*HT->MHostTask)));
 
-    // Build the wait list from the dependency events so the captured host task
-    // is ordered after them in the native graph. Events without a UR handle
-    // (e.g. completed host events) carry no capture-time ordering and are
-    // skipped.
-    std::vector<ur_event_handle_t> WaitList;
-    for (const detail::EventImplPtr &DepEvent : HT->getEvents()) {
-      if (ur_event_handle_t DepHandle = DepEvent->getHandle())
-        WaitList.push_back(DepHandle);
-    }
+    // All event dependencies supported with native recording go through UR
+    auto WaitEventList = detail::Command::getUrEvents(
+        HT->getEvents(), Queue, /*IsHostTaskCommand*/ true);
+    ur_event_handle_t SignalEvent = nullptr;
 
-    // Request a signal event so downstream captured operations can depend on
-    // the host task. Unlike the scheduler path we must not wait on it here;
-    // capture only records the node into the native graph.
-    ur_event_handle_t HostTaskEvent = nullptr;
     Queue->getAdapter().call<detail::UrApiKind::urEnqueueHostTaskExp>(
         Queue->getHandleRef(), detail::NativeHostTask<false>, CallbackData,
-        nullptr, static_cast<uint32_t>(WaitList.size()),
-        WaitList.empty() ? nullptr : WaitList.data(), &HostTaskEvent);
-
-    if (!HostTaskEvent)
-      return detail::event_impl::create_completed_host_event();
+        nullptr, static_cast<uint32_t>(WaitEventList.size()),
+        WaitEventList.empty() ? nullptr : WaitEventList.data(), &SignalEvent);
 
     auto EventImpl = detail::event_impl::create_device_event(*Queue);
     EventImpl->setStateIncomplete();
     EventImpl->setSubmittedQueue(Queue);
-    EventImpl->setHandle(HostTaskEvent);
+    EventImpl->setHandle(SignalEvent);
     return EventImpl;
   }
   if (!CommandGroup->getRequirements().empty() && Queue->isNativeRecording()) {

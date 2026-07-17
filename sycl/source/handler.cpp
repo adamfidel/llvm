@@ -820,6 +820,7 @@ detail::EventImplPtr handler::finalize() {
 
     auto EventImpl = detail::event_impl::create_device_event(*Queue);
     EventImpl->setStateIncomplete();
+    EventImpl->setSubmissionTime();
     EventImpl->setWorkerQueue(Queue->weak_from_this());
     EventImpl->setSubmittedQueue(Queue);
     EventImpl->setHandle(SignalEvent);

@@ -1,6 +1,6 @@
 // Tests that a restricted host task submitted through the
 // handler + submit_with_event path can be recorded into a SYCL Graph and
-// participate in event-based dependencies across two in-order queues:
+// participate in event-based dependencies.
 
 #include "../../graph_common.hpp"
 
@@ -17,6 +17,7 @@ int main() {
 
   queue Queue1{Ctx, Dev, {property::queue::in_order{}}};
   queue Queue2{Ctx, Dev, {property::queue::in_order{}}};
+  queue Queue3{Ctx, Dev, {property::queue::in_order{}}};
 
 #ifdef GRAPH_E2E_NATIVE_RECORDING
   exp_ext::command_graph Graph{
@@ -28,20 +29,27 @@ int main() {
   uint32_t *Data = malloc_shared<uint32_t>(N, Queue1);
   std::fill(Data, Data + N, 0);
 
-  QueueStateVerifier verifier(Queue1, Queue2);
-  verifier.verify(EXECUTING, EXECUTING);
+  QueueStateVerifier verifier(Queue1, Queue2, Queue3);
+  verifier.verify(EXECUTING, EXECUTING, EXECUTING);
 
   Graph.begin_recording(Queue1);
-  verifier.verify(RECORDING, EXECUTING);
+  verifier.verify(RECORDING, EXECUTING, EXECUTING);
 
-  // Q1 kernel: accumulate index so replays produce distinct results.
+  // Host task with no dependencies.
+  syclex::submit_with_event(Queue1, [&](handler &CGH) {
+    syclex::host_task(CGH, [=] {
+      for (size_t i = 0; i < N; i++)
+        Data[i] += 5;
+    });
+  });
+
   Queue1.submit([&](handler &CGH) {
     CGH.parallel_for(range<1>{N}, [=](id<1> idx) {
       Data[idx] += static_cast<uint32_t>(idx[0]) + 1;
     });
   });
 
-  // Fork: host task on Q1 adds 100 and signals ForkEvent.
+  // Fork: host task signals ForkEvent, consumed by Q2 and Q3.
   auto ForkEvent = syclex::submit_with_event(Queue1, [&](handler &CGH) {
     syclex::host_task(CGH, [=] {
       for (size_t i = 0; i < N; i++)
@@ -49,16 +57,29 @@ int main() {
     });
   });
 
-  // Q2 consumes ForkEvent, which transitions it into recording (fork).
+  // Q2 and Q3 run concurrently, so they operate on disjoint halves. Both add
+  // the same value so final validation is uniform across all elements.
+  // Q2 fork: kernel on the first half (host-task -> kernel dependency).
   auto Q2Event = syclex::submit_with_event(Queue2, [&](handler &CGH) {
     CGH.depends_on(ForkEvent);
-    CGH.parallel_for(range<1>{N}, [=](id<1> idx) { Data[idx] += 10; });
+    CGH.parallel_for(range<1>{N / 2}, [=](id<1> idx) { Data[idx] += 10; });
   });
-  verifier.verify(RECORDING, RECORDING);
+  verifier.verify(RECORDING, RECORDING, EXECUTING);
 
-  // Join: host task on Q1 waits on Q2Event before adding to the data.
+  // Q3 fork: host task on the second half.
+  auto Q3Event = syclex::submit_with_event(Queue3, [&](handler &CGH) {
+    CGH.depends_on(ForkEvent);
+    syclex::host_task(CGH, [=] {
+      for (size_t i = N / 2; i < N; i++)
+        Data[i] += 10;
+    });
+  });
+  verifier.verify(RECORDING, RECORDING, RECORDING);
+
+  // Join: host task waits on events from two distinct queues (multi-entry
+  // wait list, neither filtered by the in-order redundant-event optimization).
   syclex::submit_with_event(Queue1, [&](handler &CGH) {
-    CGH.depends_on(Q2Event);
+    CGH.depends_on({Q2Event, Q3Event});
     syclex::host_task(CGH, [=] {
       for (size_t i = 0; i < N; i++)
         Data[i] += 1;
@@ -69,12 +90,12 @@ int main() {
 
   auto ExecutableGraph = Graph.finalize();
 
-  // Each replay adds (i + 1) + 100 + 10 + 1 = (i + 112) to every element.
+  // Each replay adds 5 + (i + 1) + 100 + 10 + 1 = (i + 117) to every element.
   Queue1.submit([&](handler &CGH) { CGH.ext_oneapi_graph(ExecutableGraph); });
   Queue1.wait();
 
   for (size_t i = 0; i < N; i++) {
-    uint32_t Expected = static_cast<uint32_t>(i) + 112;
+    uint32_t Expected = static_cast<uint32_t>(i) + 117;
     assert(check_value(i, Expected, Data[i], "Data"));
   }
 
@@ -82,7 +103,7 @@ int main() {
   Queue1.wait();
 
   for (size_t i = 0; i < N; i++) {
-    uint32_t Expected = 2 * (static_cast<uint32_t>(i) + 112);
+    uint32_t Expected = 2 * (static_cast<uint32_t>(i) + 117);
     assert(check_value(i, Expected, Data[i], "Data"));
   }
 

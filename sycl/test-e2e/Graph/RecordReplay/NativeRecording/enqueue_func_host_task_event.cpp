@@ -1,5 +1,9 @@
 // REQUIRES: level_zero_v2_adapter && arch-intel_gpu_bmg_g21
-// REQUIRES-INTEL-DRIVER: lin: 37561, win: 101.8724
+// REQUIRES: linux
+// REQUIRES-INTEL-DRIVER: lin: 38146
+
+// TODO: Update windows driver once available with other tests. The current
+// driver restriction aligns with get_graph_multi_queue.cpp
 
 // RUN: %{build} -o %t.out
 // RUN: %{run} %t.out

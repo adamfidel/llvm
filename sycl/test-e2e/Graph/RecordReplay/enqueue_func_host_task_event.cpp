@@ -7,4 +7,4 @@
 // Tests fork/join of a restricted host_task (submit_with_event + handler path)
 // across two in-order queues via the command-buffer record-replay path.
 
-#include "Inputs/enqueue_func_host_task_handler.cpp"
+#include "Inputs/enqueue_func_host_task_event.cpp"

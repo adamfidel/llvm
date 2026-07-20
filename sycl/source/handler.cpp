@@ -383,20 +383,19 @@ getNativeGraphImpl(queue_impl &Queue) {
   return Queue.getContextImpl().getNativeGraph(UrGraphHandle);
 }
 
-// When submitting a host task we must observe both the current queue's state
-// along with the worker queue's of any dependent events to determine if one
-// will transition the current command to native recording.
+// A command submission may transition a queue into a recording state. If
+// we need to detect if a command submission is recorded into a native graph,
+// then we must also check the recording status of dependent wait event queues
+// as well.
 static std::shared_ptr<queue_impl>
-getNativeRecordingQueue(queue_impl &Queue,
-                        const std::vector<EventImplPtr> &Events) {
+getNativeRecordingPrimaryQueue(queue_impl &Queue,
+                               const std::vector<EventImplPtr> &Events) {
   if (Queue.isNativeRecording())
     return Queue.shared_from_this();
   for (const EventImplPtr &Event : Events) {
     if (!Event)
       continue;
     auto DepQueue = Event->getWorkerQueue();
-    if (!DepQueue)
-      DepQueue = Event->getSubmittedQueue();
     if (DepQueue && DepQueue->isNativeRecording())
       return DepQueue;
   }
@@ -808,8 +807,8 @@ detail::EventImplPtr handler::finalize() {
   // from a recording queue (a fork).
   std::shared_ptr<detail::queue_impl> RecordingQueue;
   if (type == detail::CGType::CodeplayHostTask)
-    RecordingQueue =
-        detail::getNativeRecordingQueue(*Queue, CommandGroup->getEvents());
+    RecordingQueue = detail::getNativeRecordingPrimaryQueue(
+        *Queue, CommandGroup->getEvents());
   if (RecordingQueue) {
     auto *HT = static_cast<detail::CGHostTask *>(CommandGroup.get());
     if (!HT->MHostTask->isCreatedFromEnqueueFunction()) {

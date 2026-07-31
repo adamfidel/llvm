@@ -18,7 +18,6 @@
 #include <functional>   // for function
 #include <list>         // for list
 #include <memory>       // for shared_ptr
-#include <mutex>        // for mutex
 #include <optional>     // for optional
 #include <set>          // for set
 #include <shared_mutex> // for shared_mutex
@@ -641,10 +640,6 @@ private:
   /// Callback data for host tasks recorded in native recording mode.
   std::vector<std::unique_ptr<detail::EnqueueHostTaskData>>
       MNativeHostTaskCallbacks;
-  /// Mutex for modifying the host task callback container. A separate
-  /// lock is used to prevent lock order inversion when acquiring both
-  /// the queue and graph lock during native recording.
-  std::mutex MNativeHostTaskCallbacksMutex;
 
   /// Mapping from queues to barrier nodes. For each queue the last barrier
   /// node recorded to the graph from the queue is stored.

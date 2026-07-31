@@ -710,7 +710,7 @@ void graph_impl::setDestructionCallback(std::function<void()> Callback) {
 
 sycl::detail::EnqueueHostTaskData *graph_impl::addNativeHostTaskCallback(
     std::unique_ptr<sycl::detail::EnqueueHostTaskData> Data) {
-  std::lock_guard<std::mutex> Lock(MNativeHostTaskCallbacksMutex);
+  graph_impl::WriteLock Lock(MMutex);
   MNativeHostTaskCallbacks.push_back(std::move(Data));
   return MNativeHostTaskCallbacks.back().get();
 }
@@ -729,6 +729,7 @@ void graph_impl::clearQueues(bool NeedsLock) {
     if (auto ValidQueue = Queue.lock(); ValidQueue) {
       if (MNativeGraphHandle) {
         auto EndResult = ValidQueue->endNativeRecording();
+        assert(!EndResult.RecordingActive);
         getContextImpl().getAdapter().checkUrResult(
             EndResult.Result, "Error when ending native graph capture");
         // CapturedGraph should be the same as MNativeGraphHandle
@@ -2288,18 +2289,19 @@ void modifiable_command_graph::end_recording(queue &RecordingQueue) {
   bool IsRecordingToThisGraph = false;
 
   if (isNativeRecordingEnabledForGraph(*impl)) {
-    // For native recording, check if queue is in our recording queue list
-    graph_impl::WriteLock Lock(impl->MMutex);
-    IsRecordingToThisGraph = impl->isQueueRecording(QueueImpl);
-
+    {
+      // For native recording, check if queue is in our recording queue list and
+      // remove if it is.
+      graph_impl::WriteLock Lock(impl->MMutex);
+      IsRecordingToThisGraph = impl->isQueueRecording(QueueImpl);
+      impl->removeQueue(QueueImpl);
+    }
     if (IsRecordingToThisGraph) {
       // End native UR graph capture
       assert(impl->getNativeGraphHandle() &&
              "Native graph handle must be valid when ending native recording");
       auto EndResult = QueueImpl.endNativeRecording();
-      if (!EndResult.RecordingActive) {
-        impl->removeQueue(QueueImpl);
-      }
+      assert(!EndResult.RecordingActive);
       impl->getContextImpl().getAdapter().checkUrResult(
           EndResult.Result, "Error when ending native graph capture");
       assert(EndResult.CapturedGraph == impl->getNativeGraphHandle() &&

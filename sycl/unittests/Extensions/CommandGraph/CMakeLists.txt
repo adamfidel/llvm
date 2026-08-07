@@ -8,6 +8,7 @@ add_sycl_unittest(CommandGraphExtensionTests OBJECT
   CommandGraph.cpp
   CommonReferenceSemantics.cpp
   Exceptions.cpp
+  ExternalEventRecording.cpp
   InOrderQueue.cpp
   MultiThreaded.cpp
   Queries.cpp

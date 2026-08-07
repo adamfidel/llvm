@@ -43,6 +43,7 @@ public:
   virtual void depends_on(const sycl::detail::EventImplPtr &) {}
   virtual void depends_on(const std::vector<detail::EventImplPtr> &Events) {}
   virtual void depends_on(event Event) {};
+  virtual void depends_onUnlockedQueue(const event &Event) {};
 
   virtual sycl::detail::EventImplPtr finalize() {
     return detail::event_impl::create_default_event();

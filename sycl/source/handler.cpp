@@ -1528,6 +1528,13 @@ void handler::depends_on(const std::vector<detail::EventImplPtr> &Events) {
   }
 }
 
+void handler::depends_onUnlockedQueue(const event &Event) {
+  registerEventDependency</*LockQueue*/ false>(
+      detail::getSyclObjImpl(Event), impl->CGData.MEvents,
+      impl->get_queue_or_null(), impl->get_context(), impl->get_device(),
+      getCommandGraph().get(), getType());
+}
+
 static bool checkContextSupports(detail::context_impl &ContextImpl,
                                  ur_context_info_t InfoQuery) {
   adapter_impl &Adapter = ContextImpl.getAdapter();

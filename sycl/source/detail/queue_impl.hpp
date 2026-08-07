@@ -764,20 +764,35 @@ protected:
     return Queue.insertHelperBarrier();
   }
 
+  /// Adds the external event set on this queue, if any, as a dependency of
+  /// \p Handler and clears it.
+  ///
+  /// The in-order finalizers call this with MMutex held. An external event
+  /// originating from a queue that is recording to a graph puts this queue into
+  /// recording mode as well, which binds the graph to the queue and so needs
+  /// MMutex. MMutex is not recursive, hence the dependency is registered
+  /// without re-acquiring it.
   template <typename HandlerType = handler>
   void synchronizeWithExternalEvent(HandlerType &Handler) {
-    // If there is an external event set, add it as a dependency and clear it.
-    // We do not need to hold the lock as MLastEventMtx will ensure the last
-    // event reflects the corresponding external event dependence as well.
     std::optional<event> ExternalEvent = popExternalEvent();
     if (ExternalEvent)
-      Handler.depends_on(*ExternalEvent);
+      Handler.depends_onUnlockedQueue(*ExternalEvent);
   }
 
   inline const detail::EventImplPtr &
   parseEvent(const detail::EventImplPtr &Event) {
     assert(!Event || !Event->isDiscarded());
     return Event;
+  }
+
+  /// Returns the in-order dependency slot in use right now, which is the
+  /// graph-recording one exactly while this queue is recording.
+  ///
+  /// Callers must re-read this after anything that can begin or end recording,
+  /// because a transition swaps which slot is live and resets the other one.
+  EventImplPtr &activeLastEventPtr() {
+    return MGraph.expired() ? MDefaultGraphDeps.LastEventPtr
+                            : MExtGraphDeps.LastEventPtr;
   }
 
   bool trySwitchingToNoEventsMode() {
@@ -804,13 +819,15 @@ protected:
 
     MEmpty.store(false, std::memory_order_release);
 
+    // Can put this queue into recording mode, so the dependency slot below is
+    // only selected afterwards.
     synchronizeWithExternalEvent(Handler);
 
     auto Event = parseEvent(Handler.finalize());
 
     if (Event &&
         !Scheduler::areEventsSafeForSchedulerBypass({*Event}, *MContext)) {
-      MDefaultGraphDeps.LastEventPtr = Event;
+      activeLastEventPtr() = Event;
       MNoLastEventMode.store(false, std::memory_order_relaxed);
     }
 
@@ -825,8 +842,11 @@ protected:
            (Handler.getType() == CGType::ExecCommandBuffer &&
             getSyclObjImpl(Handler)->MExecGraph->containsHostTask()));
 
-    auto &EventToBuildDeps = MGraph.expired() ? MDefaultGraphDeps.LastEventPtr
-                                              : MExtGraphDeps.LastEventPtr;
+    // Runs before the dependency slot is selected because it can put this queue
+    // into recording mode, which switches slots.
+    synchronizeWithExternalEvent(Handler);
+
+    EventImplPtr &EventToBuildDeps = activeLastEventPtr();
 
     if (EventToBuildDeps && Handler.getType() != CGType::AsyncAlloc) {
       // We are not in no-event mode, so we can use the last event.
@@ -845,8 +865,6 @@ protected:
     MEmpty = false;
     MNoLastEventMode = false;
 
-    synchronizeWithExternalEvent(Handler);
-
     EventToBuildDeps = parseEvent(Handler.finalize());
     assert(EventToBuildDeps);
     return EventToBuildDeps;
@@ -860,8 +878,11 @@ protected:
     assert(!(Handler.getType() == CGType::ExecCommandBuffer &&
              getSyclObjImpl(Handler)->MExecGraph->containsHostTask()));
 
-    auto &EventToBuildDeps = MGraph.expired() ? MDefaultGraphDeps.LastEventPtr
-                                              : MExtGraphDeps.LastEventPtr;
+    // Runs before the dependency slot is selected because it can put this queue
+    // into recording mode, which switches slots.
+    synchronizeWithExternalEvent(Handler);
+
+    EventImplPtr &EventToBuildDeps = activeLastEventPtr();
 
     // depends_on after an async alloc is explicitly disallowed. Async alloc
     // handles in order queue dependencies preemptively, so we skip them.
@@ -874,8 +895,6 @@ protected:
     }
 
     MEmpty = false;
-
-    synchronizeWithExternalEvent(Handler);
 
     EventToBuildDeps = parseEvent(Handler.finalize());
     if (EventToBuildDeps)

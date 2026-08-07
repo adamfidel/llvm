@@ -3032,6 +3032,11 @@ protected:
   void depends_on(const detail::EventImplPtr &Event);
   /// Registers event dependencies in this command group.
   void depends_on(const std::vector<detail::EventImplPtr> &Events);
+  /// Registers an event dependency in this command group without acquiring the
+  /// lock of the queue this handler belongs to. Only for callers that already
+  /// hold that lock; see queue_impl::synchronizeWithExternalEvent. Hidden
+  /// because it is unsafe outside that contract, and internal to libsycl.
+  __SYCL_DLL_LOCAL void depends_onUnlockedQueue(const event &Event);
 };
 
 namespace detail {

@@ -241,6 +241,21 @@ void event_impl::materializeIPCEvent() {
   // getHandleReusable.
 }
 
+ur_event_handle_t event_impl::materializeExternalEvent(queue_impl &Queue) {
+  initContextIfNeeded();
+
+  if (getHandle() == nullptr)
+    setHandle(createDeviceUrEvent(Queue.getDeviceImpl()));
+
+  // A handle without a queue is otherwise indistinguishable from an interop
+  // event, which enqueue_signal_event rejects.
+  MExternalMaterialized = true;
+
+  // Leaves MIsDefaultConstructed set so a later signal still runs through
+  // getHandleReusable, which reuses this handle.
+  return getHandle();
+}
+
 std::pair<void *, size_t> event_impl::getOrCreateIPCHandle() {
   std::lock_guard<std::mutex> Lock(MMutex);
   if (!MIPCHandleData) {

@@ -389,9 +389,10 @@ public:
   void submit_barrier_direct_without_event(
       sycl::span<const event> DepEvents, detail::CGType BarrierType,
       const detail::code_location &CodeLoc,
-      const EventImplPtr &EventForReuse = nullptr) {
+      const EventImplPtr &EventForReuse = nullptr,
+      bool IsGraphExternal = false) {
     submit_barrier_direct_impl(DepEvents, BarrierType, CodeLoc, false,
-                               EventForReuse);
+                               EventForReuse, IsGraphExternal);
   }
 
   void submit_graph_direct_without_event(
@@ -440,7 +441,8 @@ public:
   EventImplPtr submit_barrier_scheduler_bypass(
       std::vector<detail::EventImplPtr> &BarrierDepEvents,
       std::vector<detail::EventImplPtr> &DepEvents, detail::CGType BarrierType,
-      bool EventNeeded, const EventImplPtr &EventForReuse);
+      bool EventNeeded, const EventImplPtr &EventForReuse,
+      bool IsGraphExternal);
 
   /// Performs a blocking wait for the completion of all enqueued tasks in the
   /// queue.
@@ -990,12 +992,15 @@ protected:
   ///
   /// \param DepEvents is a vector of dependencies of the operation.
   /// \param CodeLoc is the code location of the submit call
+  /// \param IsGraphExternal signals that the barrier represents an external
+  ///        signal or wait on a graph being recorded on the queue.
   ///
   /// \return a SYCL event representing submitted command group or nullptr.
   EventImplPtr submit_barrier_direct_impl(
       sycl::span<const event> DepEvents, detail::CGType BarrierType,
       const detail::code_location &CodeLoc, bool CallerNeedsEvent = true,
-      const EventImplPtr &EventForReuse = nullptr);
+      const EventImplPtr &EventForReuse = nullptr,
+      bool IsGraphExternal = false);
 
   /// Helper function for submitting a memory operation with a handler.
   /// \param DepEvents is a vector of dependencies of the operation.

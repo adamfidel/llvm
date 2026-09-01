@@ -121,6 +121,18 @@ public:
   /// exists.
   void materializeIPCEvent();
 
+  /// Lazily creates the backend UR event so that it can be used as an external
+  /// dependency of a graph before it has ever been signaled. No-op if it
+  /// already exists.
+  ///
+  /// Unlike toDeviceEvent(), this leaves the event default constructed, so a
+  /// later enqueue_signal_event still goes through getHandleReusable() and
+  /// reuses the handle created here.
+  ///
+  /// \param Queue provides the device the UR event is created on
+  /// \return the backend UR handle of the event
+  ur_event_handle_t materializeExternalEvent(queue_impl &Queue);
+
   /// Returns an event UR handle and applies additional logic
   /// related to reusable events.
   ///
@@ -401,8 +413,10 @@ public:
     // handle was materialized by get(), or an event imported via
     // ipc::event::open) also own a UR handle without a queue/command, but they
     // are not interop events and must remain usable with enqueue_signal_event.
+    // The same holds for an event whose handle was materialized to be waited on
+    // as an external graph dependency before its first signal.
     return MEvent && MQueue.expired() && !MIsEnqueued && !MCommand &&
-           !MIPCEnabled && !MOpenedFromIpc;
+           !MIPCEnabled && !MOpenedFromIpc && !MExternalMaterialized;
   }
 
   // Initializes the host profiling info for the event.
@@ -460,6 +474,9 @@ protected:
   /// Exported IPC handle data for a producer IPC event.
   void *MIPCHandleData = nullptr;
   size_t MIPCHandleDataSize = 0;
+
+  /// True once materializeExternalEvent() has created the UR handle.
+  bool MExternalMaterialized = false;
 
 public:
   bool isIPCEnabled() const noexcept { return MIPCEnabled; }

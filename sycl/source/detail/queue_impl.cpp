@@ -13,6 +13,7 @@
 #include <detail/scheduler/commands.hpp>
 #include <sycl/context.hpp>
 #include <sycl/detail/common.hpp>
+#include <sycl/detail/iostream_proxy.hpp>
 #include <sycl/detail/ur.hpp>
 #include <sycl/device.hpp>
 #include <sycl/ext/oneapi/work_group_scratch_memory.hpp>
@@ -485,7 +486,8 @@ EventImplPtr queue_impl::submit_kernel_scheduler_bypass(
 EventImplPtr queue_impl::submit_barrier_scheduler_bypass(
     std::vector<detail::EventImplPtr> &BarrierDepEvents,
     std::vector<detail::EventImplPtr> &DepEvents, detail::CGType BarrierType,
-    bool EventNeeded, const EventImplPtr &EventForReuse) {
+    bool EventNeeded, const EventImplPtr &EventForReuse,
+    bool IsGraphExternal) {
 
   // EventForReuse can only be set for BarrierType equal to CGType::Barrier
   // (enqueue_signal_event function)
@@ -530,8 +532,10 @@ EventImplPtr queue_impl::submit_barrier_scheduler_bypass(
   // the UR events).
   // TODO Currently the scheduler path will only check the barrier wait
   // list.
-  if (BarrierType == CGType::BarrierWaitlist && RawBarrierDepEvents.empty() &&
-      RawDepEvents.empty()) {
+  // An external wait is never a no-op: the graph it is recorded into has to
+  // reference the event even when the event has no dependencies yet.
+  if (BarrierType == CGType::BarrierWaitlist && !IsGraphExternal &&
+      RawBarrierDepEvents.empty() && RawDepEvents.empty()) {
     if (!DiscardEvent) {
       ResEvent->setComplete();
     }
@@ -544,9 +548,29 @@ EventImplPtr queue_impl::submit_barrier_scheduler_bypass(
           getHandleRef(), RawDepEvents.size(), &RawDepEvents[0], nullptr);
     }
 
-    getAdapter().call<UrApiKind::urEnqueueEventsWaitWithBarrierExt>(
-        getHandleRef(), nullptr, 0, nullptr,
-        (DiscardEvent && !EventForReuse) ? nullptr : &UREvent);
+    if (IsGraphExternal) {
+      // TODO: Replace with the external signal UR entry point once it is
+      // defined.
+      std::cerr << "[TRACE] EXTERNAL_SIGNAL\n";
+    } else {
+      getAdapter().call<UrApiKind::urEnqueueEventsWaitWithBarrierExt>(
+          getHandleRef(), nullptr, 0, nullptr,
+          (DiscardEvent && !EventForReuse) ? nullptr : &UREvent);
+    }
+  } else if (IsGraphExternal) {
+    // The handles are collected here instead of through
+    // Command::getUrEvents so that its in-order redundancy filtering cannot
+    // drop an event which is external to the graph.
+    std::vector<ur_event_handle_t> ExternalWaitList;
+    ExternalWaitList.reserve(BarrierDepEvents.size());
+    for (const EventImplPtr &Dep : BarrierDepEvents) {
+      if (ur_event_handle_t Handle = Dep->getHandle())
+        ExternalWaitList.push_back(Handle);
+    }
+
+    // TODO: Replace with the external wait UR entry point once it is defined.
+    std::cerr << "[TRACE] EXTERNAL_WAIT (" << ExternalWaitList.size()
+              << " event(s))\n";
   } else {
 
     RawDepEvents.insert(RawDepEvents.end(), RawBarrierDepEvents.begin(),
@@ -585,7 +609,7 @@ EventImplPtr queue_impl::submit_barrier_scheduler_bypass(
 EventImplPtr queue_impl::submit_barrier_direct_impl(
     sycl::span<const event> DepEvents, detail::CGType BarrierType,
     const detail::code_location &CodeLoc, bool CallerNeedsEvent,
-    const EventImplPtr &EventForReuse) {
+    const EventImplPtr &EventForReuse, bool IsGraphExternal) {
   auto SubmitBarrierFunc = [&](detail::CG::StorageInitHelper &&CGData)
       -> std::pair<EventImplPtr, bool> {
     std::vector<detail::EventImplPtr> DepEventImpls;
@@ -615,9 +639,9 @@ EventImplPtr queue_impl::submit_barrier_direct_impl(
         CGData.MEvents, getContextImpl());
 
     if (SchedulerBypass) {
-      return {submit_barrier_scheduler_bypass(DepEventImpls, CGData.MEvents,
-                                              BarrierType, CallerNeedsEvent,
-                                              EventForReuse),
+      return {submit_barrier_scheduler_bypass(
+                  DepEventImpls, CGData.MEvents, BarrierType, CallerNeedsEvent,
+                  EventForReuse, IsGraphExternal),
               /*SchedulerBypass*/ true};
     }
 

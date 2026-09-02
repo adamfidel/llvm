@@ -8,6 +8,7 @@
 
 #include "detail/context_impl.hpp"
 #include "detail/event_impl.hpp"
+#include "detail/graph/graph_impl.hpp"
 #include "detail/queue_impl.hpp"
 #include <sycl/detail/ur.hpp>
 #include <sycl/ext/oneapi/experimental/reusable_events.hpp>
@@ -74,6 +75,29 @@ static void CheckEventAndThrow(detail::event_impl &EventImpl,
   }
 }
 
+/// An event which was enqueued for signaling while a queue was recording a
+/// graph is not signaled by the backend at all: the signal is a node of that
+/// graph, so a wait on the event has to become an edge from that node. Prepares
+/// such a wait, or rejects it if it cannot be expressed as an edge.
+static void PrepareGraphWaitAndThrow(detail::queue_impl &QueueImpl,
+                                     detail::event_impl &EventImpl) {
+  auto EventGraph = EventImpl.getCommandGraph();
+  auto QueueGraph = QueueImpl.getCommandGraph();
+
+  if (QueueGraph && QueueGraph != EventGraph) {
+    throw sycl::exception(
+        sycl::make_error_code(errc::invalid),
+        "An event can only be enqueued for waiting on a queue which is "
+        "recording a graph if it was enqueued for signaling on a queue "
+        "recording the same graph.");
+  }
+
+  // Transitive queue recording: the wait is what pulls this queue into the
+  // graph, exactly as it does for a dependency taken through depends_on.
+  if (EventGraph && !QueueGraph)
+    EventGraph->beginRecording(QueueImpl);
+}
+
 } // namespace detail
 
 __SYCL_EXPORT void enqueue_wait_event(sycl::queue q, const event &evt) {
@@ -81,6 +105,7 @@ __SYCL_EXPORT void enqueue_wait_event(sycl::queue q, const event &evt) {
   detail::event_impl &EventImpl = *sycl::detail::getSyclObjImpl(evt);
 
   detail::CheckEventAndThrow(EventImpl, QueueImpl.getContextImpl());
+  detail::PrepareGraphWaitAndThrow(QueueImpl, EventImpl);
 
   QueueImpl.submit_barrier_direct_without_event(
       sycl::span<const event>(&evt, 1), detail::CGType::BarrierWaitlist,
@@ -92,8 +117,9 @@ __SYCL_EXPORT void enqueue_wait_events(sycl::queue q,
   detail::queue_impl &QueueImpl = *sycl::detail::getSyclObjImpl(q);
 
   for (const sycl::event &evt : evts) {
-    detail::CheckEventAndThrow(*sycl::detail::getSyclObjImpl(evt),
-                               QueueImpl.getContextImpl());
+    detail::event_impl &EventImpl = *sycl::detail::getSyclObjImpl(evt);
+    detail::CheckEventAndThrow(EventImpl, QueueImpl.getContextImpl());
+    detail::PrepareGraphWaitAndThrow(QueueImpl, EventImpl);
   }
 
   QueueImpl.submit_barrier_direct_without_event(
@@ -110,10 +136,13 @@ __SYCL_EXPORT void enqueue_signal_event(sycl::queue q, event &evt) {
         "Enqueueing an interop event for signaling is not supported.");
   }
 
-  if (QueueImpl.hasCommandGraph()) {
-    throw sycl::exception(sycl::make_error_code(errc::runtime),
-                          "Enqueueing an event for signaling is not supported "
-                          "on a queue which is recording a graph.");
+  // While recording, the signal becomes an empty graph node rather than a
+  // backend signal, so nothing ever signals the handle exported to a peer
+  // process.
+  if (QueueImpl.hasCommandGraph() && EventImpl.isIPCEnabled()) {
+    throw sycl::exception(sycl::make_error_code(errc::invalid),
+                          "An IPC-enabled event cannot be enqueued for "
+                          "signaling on a queue which is recording a graph.");
   }
 
   detail::CheckEventAndThrow(EventImpl, QueueImpl.getContextImpl());

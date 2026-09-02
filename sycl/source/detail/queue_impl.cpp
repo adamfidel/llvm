@@ -621,6 +621,25 @@ EventImplPtr queue_impl::submit_barrier_direct_impl(
               /*SchedulerBypass*/ true};
     }
 
+    std::unique_ptr<detail::CG> CommandGroup;
+
+    if (auto GraphImpl = getCommandGraph(); GraphImpl) {
+      // While recording, a reusable event is not signaled by the backend at
+      // all: the signal becomes an empty node and any wait on the event becomes
+      // an edge from that node, so the dependency is expressed by the graph
+      // topology instead. Waiting on an event which no node of this graph
+      // signals is rejected by graph_impl::getCGEdges.
+      CGData.MEvents.insert(std::end(CGData.MEvents), std::begin(DepEventImpls),
+                            std::end(DepEventImpls));
+      CommandGroup.reset(
+          new detail::CG(detail::CGType::Barrier, std::move(CGData), CodeLoc));
+
+      return {this->submit_command_to_graph(
+                  *GraphImpl, std::move(CommandGroup), CGType::Barrier,
+                  ext::oneapi::experimental::node_type::empty, EventForReuse),
+              false};
+    }
+
     if (EventForReuse || !CallerNeedsEvent) {
       // Current limitation: reusable events require scheduler bypass so that
       // the barrier can be submitted directly to the backend with the reusable
@@ -636,19 +655,6 @@ EventImplPtr queue_impl::submit_barrier_direct_impl(
           sycl::make_error_code(errc::invalid),
           "An event cannot be enqueued for signaling or waiting "
           "behind a command which is not enqueued in the backend.");
-    }
-
-    std::unique_ptr<detail::CG> CommandGroup;
-
-    if (auto GraphImpl = getCommandGraph(); GraphImpl) {
-      CGData.MEvents.insert(std::end(CGData.MEvents), std::begin(DepEventImpls),
-                            std::end(DepEventImpls));
-      CommandGroup.reset(
-          new detail::CG(detail::CGType::Barrier, std::move(CGData), CodeLoc));
-
-      return {this->submit_command_to_graph(
-                  *getCommandGraph(), std::move(CommandGroup), CGType::Barrier),
-              false};
     }
 
     CommandGroup.reset(
@@ -743,7 +749,8 @@ queue_impl::ext_oneapi_get_graph_impl() const {
 EventImplPtr queue_impl::submit_command_to_graph(
     ext::oneapi::experimental::detail::graph_impl &GraphImpl,
     std::unique_ptr<detail::CG> CommandGroup, sycl::detail::CGType CGType,
-    sycl::ext::oneapi::experimental::node_type UserFacingNodeType) {
+    sycl::ext::oneapi::experimental::node_type UserFacingNodeType,
+    const EventImplPtr &ReusableEventToSignal) {
   auto EventImpl = detail::event_impl::create_completed_host_event();
   EventImpl->setSubmittedQueue(this);
   ext::oneapi::experimental::detail::node_impl *NodeImpl = nullptr;
@@ -791,6 +798,9 @@ EventImplPtr queue_impl::submit_command_to_graph(
 
   // Associate an event with this new node and return the event.
   GraphImpl.addEventForNode(EventImpl, *NodeImpl);
+
+  if (ReusableEventToSignal)
+    GraphImpl.setReusableEventNodeUnlocked(ReusableEventToSignal, *NodeImpl);
 
   return EventImpl;
 }

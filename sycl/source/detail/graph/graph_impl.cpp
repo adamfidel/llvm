@@ -449,12 +449,17 @@ std::set<node_impl *> graph_impl::getCGEdges(
   // Add any nodes specified by event dependencies into the dependency list
   std::set<node_impl *> UniqueDeps;
   for (auto &Dep : CommandGroup->getEvents()) {
-    if (auto NodeImpl = MEventsMap.find(Dep); NodeImpl == MEventsMap.end()) {
+    if (auto NodeImpl = MEventsMap.find(Dep); NodeImpl != MEventsMap.end()) {
+      UniqueDeps.insert(NodeImpl->second);
+    } else if (auto ReusableNode = MReusableEventNodes.find(Dep);
+               ReusableNode != MReusableEventNodes.end()) {
+      // A reusable event which was enqueued for signaling in this graph is
+      // represented by the node which signals it.
+      UniqueDeps.insert(ReusableNode->second);
+    } else {
       throw sycl::exception(sycl::make_error_code(errc::invalid),
                             "Event dependency from handler::depends_on does "
                             "not correspond to a node within the graph");
-    } else {
-      UniqueDeps.insert(NodeImpl->second);
     }
   }
 
@@ -674,6 +679,8 @@ void graph_impl::addQueue(sycl::detail::queue_impl &RecordingQueue) {
 
 void graph_impl::removeQueue(sycl::detail::queue_impl &RecordingQueue) {
   MRecordingQueues.erase(RecordingQueue.weak_from_this());
+  if (MRecordingQueues.empty())
+    releaseReusableEventNodesUnlocked();
 }
 
 bool graph_impl::isQueueRecording(sycl::detail::queue_impl &Queue) {
@@ -723,6 +730,7 @@ void graph_impl::clearQueues(bool NeedsLock) {
       Guard.lock();
     }
     std::swap(MRecordingQueues, SwappedQueues);
+    releaseReusableEventNodesUnlocked();
   }
 
   for (auto &Queue : SwappedQueues) {

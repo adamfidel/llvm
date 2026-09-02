@@ -211,6 +211,38 @@ public:
     MEventsMap[EventImpl] = &NodeImpl;
   }
 
+  /// Associate a reusable event which was enqueued for signaling during
+  /// recording with the node representing that signal, so that a later
+  /// enqueue_wait_event() on the same event can be resolved into a graph edge.
+  ///
+  /// Unlike addEventForNode() this is rebindable: signaling the same event
+  /// again re-points it at the newer node. The association is dropped again by
+  /// releaseReusableEventNodesUnlocked() once recording ends, which is what
+  /// makes the event usable outside the graph afterwards.
+  ///
+  /// @param Event Reusable event enqueued for signaling.
+  /// @param NodeImpl Node representing the signal.
+  /// @pre The caller holds a write lock on MMutex.
+  void
+  setReusableEventNodeUnlocked(std::shared_ptr<sycl::detail::event_impl> Event,
+                               node_impl &NodeImpl) {
+    Event->setCommandGraph(shared_from_this());
+    MReusableEventNodes[std::move(Event)] = &NodeImpl;
+  }
+
+  /// Unbind every reusable event which was enqueued for signaling in this graph
+  /// from it. Called when the graph stops being recorded to: from then on the
+  /// events are no longer graph events, so they can be waited on and signaled
+  /// eagerly again.
+  /// @pre The caller holds a write lock on MMutex.
+  void releaseReusableEventNodesUnlocked() {
+    for (auto &[Event, Node] : MReusableEventNodes) {
+      std::ignore = Node;
+      Event->setCommandGraph(nullptr);
+    }
+    MReusableEventNodes.clear();
+  }
+
   /// Find the sycl event associated with a node.
   /// @param NodeImpl Node to find event for.
   /// @return Event associated with node.
@@ -613,6 +645,13 @@ private:
   /// Map of events to their associated recorded nodes.
   std::unordered_map<std::shared_ptr<sycl::detail::event_impl>, node_impl *>
       MEventsMap;
+  /// Map of reusable events which have been enqueued for signaling while
+  /// recording, to the node representing that signal. Kept separate from
+  /// MEventsMap because these events are owned by the user: they must stay
+  /// waitable and re-signalable outside the graph, and re-signaling rebinds the
+  /// mapping rather than adding a node.
+  std::unordered_map<std::shared_ptr<sycl::detail::event_impl>, node_impl *>
+      MReusableEventNodes;
   /// Map for every in-order queue thats recorded a node to the graph, what
   /// the last node added was. We can use this to create new edges on the last
   /// node if any more nodes are added to the graph from the queue.

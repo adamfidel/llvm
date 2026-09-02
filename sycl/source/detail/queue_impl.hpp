@@ -683,11 +683,15 @@ public:
   std::shared_ptr<ext::oneapi::experimental::detail::graph_impl>
   ext_oneapi_get_graph_impl() const;
 
+  /// \param ReusableEventToSignal if set, the reusable event which the new node
+  ///        represents the signaling of. See graph_impl::
+  ///        setReusableEventNodeUnlocked.
   EventImplPtr submit_command_to_graph(
       ext::oneapi::experimental::detail::graph_impl &GraphImpl,
       std::unique_ptr<detail::CG> CommandGroup, sycl::detail::CGType CGType,
       sycl::ext::oneapi::experimental::node_type UserFacingNodeType =
-          ext::oneapi::experimental::node_type::empty);
+          ext::oneapi::experimental::node_type::empty,
+      const EventImplPtr &ReusableEventToSignal = nullptr);
 
   unsigned long long getQueueID() { return MQueueID; }
 

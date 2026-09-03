@@ -36,6 +36,15 @@ struct GraphState {
 
 inline constexpr uint64_t FirstGraphId = 1;
 
+// The failure a test asked an entry point to report. Mock callbacks are plain
+// function pointers and cannot capture, so the entry point and the code live
+// here rather than in the installed callback. At most one failure is live at a
+// time, which is all a test needs and keeps the callbacks free of a lookup.
+struct InjectedFailure {
+  std::string EntryPoint;
+  ur_result_t Error = UR_RESULT_SUCCESS;
+};
+
 // Singleton state the mock callbacks share.
 struct MockState {
   bool SupportsNativeRecording = true;
@@ -44,11 +53,24 @@ struct MockState {
   std::unordered_map<ur_exp_graph_handle_t, GraphState> Graphs;
   std::unordered_map<ur_queue_handle_t, ur_exp_graph_handle_t> PrimaryCapturing;
   uint64_t NextGraphId = FirstGraphId;
+  InjectedFailure Failure;
 
   GraphState &graph(ur_exp_graph_handle_t Handle);
 };
 
 MockState &state();
+
+// Fails EntryPoint before its mock implementation runs, modelling UR rejecting
+// the call outright: the mock state is left untouched. The call is still
+// traced.
+void failBeforeWith(std::string EntryPoint, ur_result_t Error);
+
+// Fails EntryPoint after its mock implementation ran, modelling UR doing the
+// work and then reporting a problem: the trace and the mock state reflect a
+// completed call, but the entry point returns Error. Use this where the mock
+// state has to keep up with the failure, e.g. a capture that UR closed before
+// rejecting it.
+void failAfterWith(std::string EntryPoint, ur_result_t Error);
 
 size_t traceCount(std::string_view EntryPoint);
 

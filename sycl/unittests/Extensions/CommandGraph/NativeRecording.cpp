@@ -8,9 +8,14 @@
 
 #include "NativeRecordingMock.hpp"
 
+#include <gmock/gmock.h>
+
+using NativeRecordingMock::failAfterWith;
+using NativeRecordingMock::failBeforeWith;
 using NativeRecordingMock::state;
 using NativeRecordingMock::traceCount;
 using NativeRecordingMock::traceIndex;
+using ::testing::HasSubstr;
 
 // Test that native recording throws when UR does not support it
 TEST_F(NativeRecordingTest, NativeRecordingUnsupportedDevice) {
@@ -183,4 +188,154 @@ TEST_F(NativeRecordingTest, GetStateUrTrace) {
   EXPECT_EQ(Queue.ext_oneapi_get_state(), experimental::queue_state::executing);
 
   EXPECT_GE(traceCount("urQueueIsGraphCaptureEnabledExp"), 3u);
+}
+
+// The tests below check that a failure reported by a UR native recording entry
+// point reaches the user with the originating UR error code preserved on the
+// exception and named in what(). Graph operations that go through the graph
+// implementation also name the operation they came from; the kernel enqueue,
+// event wait and queue wait paths are shared with non-graph submissions and
+// only report the generic UR error, so the UR code is what identifies the graph
+// problem.
+
+namespace {
+
+// Runs Operation, which is expected to throw, and returns the message of the
+// exception after checking the SYCL error code and the UR error code carried by
+// it. Returns an empty message if nothing was thrown.
+template <typename FnT>
+std::string failureMessage(FnT Operation, sycl::errc ExpectedCode,
+                           ur_result_t ExpectedUrError) {
+  try {
+    Operation();
+  } catch (sycl::exception &E) {
+    EXPECT_EQ(E.code(), ExpectedCode);
+    EXPECT_EQ(sycl::detail::get_ur_error(E),
+              static_cast<int32_t>(ExpectedUrError));
+    return E.what();
+  }
+  ADD_FAILURE() << "Expected an exception";
+  return {};
+}
+
+} // namespace
+
+// A recording session that still has open forks is only detected when the
+// capture is closed, so the error surfaces from end_recording. UR stops
+// capturing before rejecting such a capture, hence the after-stage failure: the
+// queue is left executing and there is nothing for the test to end afterwards.
+TEST_F(NativeRecordingTest, UnjoinedForkDescriptiveError) {
+  auto Graph = makeGraph();
+  Graph.begin_recording(Queue);
+
+  failAfterWith("urQueueEndGraphCaptureExp",
+                UR_RESULT_ERROR_GRAPH_UNJOINED_FORKS);
+  std::string Message =
+      failureMessage([&]() { Graph.end_recording(Queue); }, sycl::errc::runtime,
+                     UR_RESULT_ERROR_GRAPH_UNJOINED_FORKS);
+  EXPECT_THAT(Message, HasSubstr("ending native graph capture"));
+  EXPECT_THAT(Message, HasSubstr("UR_RESULT_ERROR_GRAPH_UNJOINED_FORKS"));
+
+  EXPECT_EQ(Queue.ext_oneapi_get_state(), experimental::queue_state::executing);
+}
+
+// Using a graph-internal event outside of the graph is reported by the command
+// that consumes it, i.e. a kernel enqueue during recording.
+TEST_F(NativeRecordingTest, InternalEventDescriptiveError) {
+  auto Graph = makeGraph();
+  Graph.begin_recording(Queue);
+
+  failBeforeWith("urEnqueueKernelLaunchWithArgsExp",
+                 UR_RESULT_ERROR_GRAPH_INTERNAL_EVENT);
+  std::string Message = failureMessage(
+      [&]() {
+        Queue.submit(
+            [&](sycl::handler &CGH) { CGH.single_task<TestKernel>([]() {}); });
+      },
+      sycl::errc::runtime, UR_RESULT_ERROR_GRAPH_INTERNAL_EVENT);
+  EXPECT_THAT(Message, HasSubstr("UR_RESULT_ERROR_GRAPH_INTERNAL_EVENT"));
+
+  Graph.end_recording(Queue);
+}
+
+// A submission that would splice two recording sessions together is rejected by
+// the kernel enqueue.
+TEST_F(NativeRecordingTest, MergeAttemptDescriptiveError) {
+  auto Graph = makeGraph();
+  Graph.begin_recording(Queue);
+
+  failBeforeWith("urEnqueueKernelLaunchWithArgsExp",
+                 UR_RESULT_ERROR_GRAPH_CAPTURE_MERGE_ATTEMPT);
+  std::string Message = failureMessage(
+      [&]() {
+        Queue.submit(
+            [&](sycl::handler &CGH) { CGH.single_task<TestKernel>([]() {}); });
+      },
+      sycl::errc::runtime, UR_RESULT_ERROR_GRAPH_CAPTURE_MERGE_ATTEMPT);
+  EXPECT_THAT(Message,
+              HasSubstr("UR_RESULT_ERROR_GRAPH_CAPTURE_MERGE_ATTEMPT"));
+
+  Graph.end_recording(Queue);
+}
+
+// An event signaled inside the recording belongs to the graph, so a host wait
+// on it is unsupported while the capture is open.
+TEST_F(NativeRecordingTest, RecordedEventHostWaitDescriptiveError) {
+  auto Graph = makeGraph();
+  Graph.begin_recording(Queue);
+
+  sycl::event RecordedEvent = Queue.submit(
+      [&](sycl::handler &CGH) { CGH.single_task<TestKernel>([]() {}); });
+
+  failBeforeWith("urEventWait", UR_RESULT_ERROR_GRAPH_CAPTURE_UNSUPPORTED);
+  std::string Message =
+      failureMessage([&]() { RecordedEvent.wait(); }, sycl::errc::runtime,
+                     UR_RESULT_ERROR_GRAPH_CAPTURE_UNSUPPORTED);
+  EXPECT_THAT(Message, HasSubstr("UR_RESULT_ERROR_GRAPH_CAPTURE_UNSUPPORTED"));
+
+  Graph.end_recording(Queue);
+}
+
+// Draining a queue that is recording would require executing the captured work,
+// which is unsupported.
+TEST_F(NativeRecordingTest, RecordingQueueWaitDescriptiveError) {
+  auto Graph = makeGraph();
+  Graph.begin_recording(Queue);
+
+  failBeforeWith("urQueueFinish", UR_RESULT_ERROR_GRAPH_CAPTURE_UNSUPPORTED);
+  std::string Message =
+      failureMessage([&]() { Queue.wait(); }, sycl::errc::runtime,
+                     UR_RESULT_ERROR_GRAPH_CAPTURE_UNSUPPORTED);
+  EXPECT_THAT(Message, HasSubstr("UR_RESULT_ERROR_GRAPH_CAPTURE_UNSUPPORTED"));
+
+  Graph.end_recording(Queue);
+}
+
+// Graph construction failures name graph creation, since the property that
+// requested native recording is the only clue the user has at that point.
+TEST_F(NativeRecordingTest, GraphCreateDescriptiveError) {
+  failBeforeWith("urGraphCreateExp", UR_RESULT_ERROR_OUT_OF_RESOURCES);
+  std::string Message =
+      failureMessage([&]() { makeGraph(); }, sycl::errc::runtime,
+                     UR_RESULT_ERROR_OUT_OF_RESOURCES);
+  EXPECT_THAT(Message, HasSubstr("create native UR graph"));
+  EXPECT_THAT(Message, HasSubstr("UR_RESULT_ERROR_OUT_OF_RESOURCES"));
+}
+
+// finalize() instantiates the recorded graph, so a graph rejected at that point
+// is reported against the instantiation rather than the recording.
+TEST_F(NativeRecordingTest, FinalizeDescriptiveError) {
+  auto Graph = makeGraph();
+
+  Graph.begin_recording(Queue);
+  Queue.submit(
+      [&](sycl::handler &CGH) { CGH.single_task<TestKernel>([]() {}); });
+  Graph.end_recording(Queue);
+
+  failBeforeWith("urGraphInstantiateGraphExp", UR_RESULT_ERROR_INVALID_GRAPH);
+  std::string Message =
+      failureMessage([&]() { Graph.finalize(); }, sycl::errc::runtime,
+                     UR_RESULT_ERROR_INVALID_GRAPH);
+  EXPECT_THAT(Message, HasSubstr("instantiate native UR executable graph"));
+  EXPECT_THAT(Message, HasSubstr("UR_RESULT_ERROR_INVALID_GRAPH"));
 }

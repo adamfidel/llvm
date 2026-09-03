@@ -57,6 +57,20 @@ void trace(std::string EntryPoint, const void *Handle = nullptr) {
   state().Trace.push_back({std::move(EntryPoint), Handle});
 }
 
+// Traces on behalf of the callback it displaced, since aborting the call here
+// keeps that callback and the mock implementation from running. Both callbacks
+// stay registered once a test has installed them, so they must do nothing until
+// a failure is asked for.
+ur_result_t failBeforeCallback(void *) {
+  const InjectedFailure &Failure = state().Failure;
+  if (Failure.Error == UR_RESULT_SUCCESS)
+    return UR_RESULT_SUCCESS;
+  trace(Failure.EntryPoint);
+  return Failure.Error;
+}
+
+ur_result_t failAfterCallback(void *) { return state().Failure.Error; }
+
 // This is called after urDeviceGetInfo() to inject native recording support
 ur_result_t mock_urDeviceGetInfoAfter(void *pParams) {
   auto Params = *static_cast<ur_device_get_info_params_t *>(pParams);
@@ -185,6 +199,27 @@ ur_result_t mock_urEnqueueGraphExpBefore(void *pParams) {
 }
 
 } // namespace
+
+namespace {
+
+void injectFailure(std::string EntryPoint, ur_result_t Error) {
+  assert(Error != UR_RESULT_SUCCESS && "Injected error must be a failure");
+  assert(state().Failure.Error == UR_RESULT_SUCCESS &&
+         "Only one injected failure can be live at a time");
+  state().Failure = {std::move(EntryPoint), Error};
+}
+
+} // namespace
+
+void failBeforeWith(std::string EntryPoint, ur_result_t Error) {
+  mock::getCallbacks().set_before_callback(EntryPoint, &failBeforeCallback);
+  injectFailure(std::move(EntryPoint), Error);
+}
+
+void failAfterWith(std::string EntryPoint, ur_result_t Error) {
+  mock::getCallbacks().set_after_callback(EntryPoint, &failAfterCallback);
+  injectFailure(std::move(EntryPoint), Error);
+}
 
 // Extends entry point with UR tracing in the singleton
 #define TRACE_UR_ENTRY_POINT(EntryPoint)                                       \

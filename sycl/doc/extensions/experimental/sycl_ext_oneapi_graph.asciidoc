@@ -235,6 +235,7 @@ Table {counter: tableNumber}. Values of the `SYCL_EXT_ONEAPI_GRAPH` macro.
 |Value |Description
 |1     |Initial extension version. Base features are supported.
 |2     |Add `property::graph::enable_native_recording` to support backend-level graph capture.
+|3     |Add `command_graph::get_info()` and the `info::graph` information descriptors.
 |===
 
 === SYCL Graph Terminology [[terminology]]
@@ -691,6 +692,12 @@ enum class graph_state {
   executable
 };
 
+// Which layer owns the graph's node model
+enum class graph_recording_mode {
+  runtime,
+  native
+};
+
 // New object representing graph
 template<graph_state State = graph_state::modifiable>
 class command_graph {};
@@ -734,6 +741,9 @@ public:
   void set_destruction_callback(Func&& callback, ArgTs&&... cbArgs);
 
   size_t get_id() const noexcept;
+
+  template <typename Param>
+  typename Param::return_type get_info() const noexcept;
 };
 
 template<>
@@ -746,6 +756,9 @@ public:
     void update(const command_graph<graph_state::modifiable>& graph);
 
     size_t get_required_mem_size() const noexcept;
+
+    template <typename Param>
+    typename Param::return_type get_info() const noexcept;
 };
 
 }  // namespace sycl::ext::oneapi::experimental
@@ -799,6 +812,96 @@ being `graph_state::modifiable` to reduce code verbosity on construction.
 graph LR
     Modifiable -->|Finalize| Executable
 ....
+
+==== Graph Information Descriptors [[graph-info-descriptors]]
+
+Characteristics of a `command_graph` object can be queried with the
+`command_graph::get_info()` member function, using the information descriptors
+in the `info::graph` namespace.
+
+[source,c++]
+----
+namespace sycl::ext::oneapi::experimental {
+
+// Which layer owns the graph's node model
+enum class graph_recording_mode {
+  runtime,
+  native
+};
+
+namespace info::graph {
+
+struct recording_mode;
+struct cycle_checks_enabled;
+struct buffers_allowed;
+struct updatable;
+struct profiling_enabled;
+
+} // namespace info::graph
+} // namespace sycl::ext::oneapi::experimental
+----
+
+These descriptors report the effective state of the graph object, which is
+not necessarily the same as the contents of the `property_list` the graph was
+constructed with.
+
+Each descriptor is only valid in a subset of the graph states, as given in the
+table below. Querying a descriptor in a state in which it is not valid is
+ill-formed.
+
+Table {counter: tableNumber}. Graph information descriptors.
+[%header,cols="2,2,1,1,4"]
+|===
+| Descriptor | `return_type` | Valid in _modifiable_ | Valid in _executable_ | Returns
+
+| `info::graph::recording_mode`
+| `graph_recording_mode`
+| yes
+| yes
+| `graph_recording_mode::native` if native recording is in effect for this
+  graph, otherwise `graph_recording_mode::runtime`. Native recording is in
+  effect if the graph was created with
+  `property::graph::enable_native_recording`, or if it was enabled by any other
+  implementation-defined means, such as setting
+  `SYCL_GRAPH_FORCE_NATIVE_RECORDING=1` in {dpcpp}. For an executable graph,
+  the value reported is that of the modifiable graph it was finalized from.
+
+  `graph_recording_mode::runtime` indicates that the SYCL runtime owns the
+  graph's node model. It is the value reported for any graph that does not use
+  native recording, including a graph built exclusively through the explicit
+  graph-building API and never used for queue recording.
+
+| `info::graph::cycle_checks_enabled`
+| `bool`
+| yes
+| no
+| `false` if the graph was created with `property::graph::no_cycle_check`,
+  otherwise `true`. Note that the sense of this descriptor is the inverse of
+  that of the property: it reports whether cycle checks are performed, not
+  whether they are disabled.
+
+| `info::graph::buffers_allowed`
+| `bool`
+| yes
+| no
+| `true` if the graph was created with
+  `property::graph::assume_buffer_outlives_graph`, otherwise `false`.
+
+| `info::graph::updatable`
+| `bool`
+| no
+| yes
+| `true` if the graph was finalized with `property::graph::updatable`,
+  otherwise `false`.
+
+| `info::graph::profiling_enabled`
+| `bool`
+| no
+| yes
+| `true` if the graph was finalized with `property::graph::enable_profiling`,
+  otherwise `false`.
+
+|===
 
 ==== Executable Graph Update [[executable-graph-update]]
 
@@ -1618,6 +1721,21 @@ _Constraints:_ This member function is only available when the `command_graph` s
 
 _Returns:_ The total size in bytes of the memory required for
 <<graph-memory-allocations, graph-owned memory allocations>> in this graph.
+
+[source,c++]
+----
+template <typename Param>
+typename Param::return_type get_info() const noexcept;
+----
+
+_Constraints:_ `Param` must be one of the
+<<graph-info-descriptors, graph information descriptors>> and must be valid in
+the state of this `command_graph` as given by the descriptor table. This member
+function is available in both graph states.
+
+_Returns:_ Information about the graph, as described in the
+<<graph-info-descriptors, graph information descriptor>> table.
+
 
 =====  Member functions of the `command_graph` class for graph update
 
@@ -2776,5 +2894,7 @@ if used in application code.
 |2|2023-08-01|Pablo Reble, Ewan Crawford, Ben Tracy, Julian Miller,
 Maxime France-Pillois
 |Promote status to experimental
+|3|2026-08-06|Adam Fidel
+|Add `command_graph::get_info()` and the `info::graph` information descriptors
 
 |========================================

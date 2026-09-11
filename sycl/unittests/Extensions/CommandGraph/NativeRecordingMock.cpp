@@ -23,8 +23,9 @@ MockState &state() {
   return State;
 }
 
-void trace(std::string EntryPoint, const void *Handle) {
-  state().Trace.push_back({std::move(EntryPoint), Handle});
+void trace(std::string EntryPoint, const void *Handle,
+           std::optional<uint32_t> WaitListSize) {
+  state().Trace.push_back({std::move(EntryPoint), Handle, WaitListSize});
 }
 
 size_t traceCount(std::string_view EntryPoint) {
@@ -55,6 +56,20 @@ size_t traceIndex(std::string_view EntryPoint) {
   return It - Trace.begin();
 }
 
+std::vector<uint32_t> waitListSizes(std::string_view EntryPoint) {
+  std::vector<uint32_t> Sizes;
+  for (const TraceEntry &Entry : state().Trace) {
+    if (Entry.EntryPoint != EntryPoint)
+      continue;
+    if (!Entry.WaitListSize) {
+      ADD_FAILURE() << EntryPoint << " does not record a wait list size";
+      return {};
+    }
+    Sizes.push_back(*Entry.WaitListSize);
+  }
+  return Sizes;
+}
+
 namespace {
 
 // This is called after urDeviceGetInfo() to inject native recording support
@@ -66,7 +81,28 @@ ur_result_t mock_urDeviceGetInfoAfter(void *pParams) {
           state().SupportsNativeRecording;
     if (*Params.ppPropSizeRet)
       **Params.ppPropSizeRet = sizeof(ur_bool_t);
+  } else if (*Params.ppropName == UR_DEVICE_INFO_REUSABLE_EVENTS_SUPPORT_EXP) {
+    if (*Params.ppPropValue)
+      *static_cast<ur_bool_t *>(*Params.ppPropValue) = true;
+    if (*Params.ppPropSizeRet)
+      **Params.ppPropSizeRet = sizeof(ur_bool_t);
   }
+  return UR_RESULT_SUCCESS;
+}
+
+ur_result_t mock_urEventCreateExp(void *pParams) {
+  auto Params = *static_cast<ur_event_create_exp_params_t *>(pParams);
+  **Params.pphEvent = mock::createDummyHandle<ur_event_handle_t>();
+  return UR_RESULT_SUCCESS;
+}
+
+// Records the wait list alongside the call, so tests can tell an explicitly
+// named dependency from one SYCL dropped in favour of in-order semantics.
+ur_result_t mock_urEnqueueKernelLaunchWithArgsExpBefore(void *pParams) {
+  auto Params =
+      *static_cast<ur_enqueue_kernel_launch_with_args_exp_params_t *>(pParams);
+  trace("urEnqueueKernelLaunchWithArgsExp", *Params.phQueue,
+        *Params.pnumEventsInWaitList);
   return UR_RESULT_SUCCESS;
 }
 
@@ -214,10 +250,15 @@ void registerDefaultCallbacks() {
   REPLACE_UR_ENTRY_POINT(urQueueGetGraphExp);
 #undef REPLACE_UR_ENTRY_POINT
 
+  mock::getCallbacks().set_replace_callback("urEventCreateExp",
+                                            &mock_urEventCreateExp);
+
   mock::getCallbacks().set_before_callback("urEnqueueGraphExp",
                                            &mock_urEnqueueGraphExpBefore);
+  mock::getCallbacks().set_before_callback(
+      "urEnqueueKernelLaunchWithArgsExp",
+      &mock_urEnqueueKernelLaunchWithArgsExpBefore);
 
-  TRACE_UR_ENTRY_POINT(urEnqueueKernelLaunchWithArgsExp);
   TRACE_UR_ENTRY_POINT(urCommandBufferCreateExp);
 }
 #undef TRACE_UR_ENTRY_POINT

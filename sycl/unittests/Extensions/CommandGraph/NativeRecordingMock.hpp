@@ -27,6 +27,9 @@ namespace NativeRecordingMock {
 struct TraceEntry {
   std::string EntryPoint;
   const void *Handle;
+  // Number of UR events in the call's wait list. Only recorded for enqueue
+  // entry points, which are the ones that can drop an in-order dependency.
+  std::optional<uint32_t> WaitListSize;
 };
 
 // Unique per-graph state
@@ -54,7 +57,8 @@ struct MockState {
 MockState &state();
 
 // Records a call to EntryPoint, optionally against the object it was about.
-void trace(std::string EntryPoint, const void *Handle = nullptr);
+void trace(std::string EntryPoint, const void *Handle = nullptr,
+           std::optional<uint32_t> WaitListSize = std::nullopt);
 
 // Fails EntryPoint before its mock implementation runs while still tracing the
 // call
@@ -107,6 +111,11 @@ size_t traceCount(std::string_view EntryPoint, const void *Handle);
 // Position of the first call to EntryPoint, so that comparing two positions
 // orders two calls. Fails the test and returns npos if it was never called.
 size_t traceIndex(std::string_view EntryPoint);
+
+// Wait list size seen by each call to EntryPoint, in call order. A zero means
+// SYCL relied on the queue's in-order property instead of naming the
+// dependency, which does not carry across a capture boundary.
+std::vector<uint32_t> waitListSizes(std::string_view EntryPoint);
 
 // Resets the mock state and registers the callbacks. Must run after the UrMock
 // constructor. The default callbacks are meant to

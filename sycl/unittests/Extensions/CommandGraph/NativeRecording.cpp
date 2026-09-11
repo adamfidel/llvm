@@ -9,11 +9,25 @@
 #include "NativeRecordingMock.hpp"
 
 #include <detail/context_impl.hpp>
+#include <sycl/ext/oneapi/experimental/enqueue_functions.hpp>
+#include <sycl/ext/oneapi/experimental/reusable_events.hpp>
 
 using NativeRecordingMock::expectFailure;
 using NativeRecordingMock::state;
 using NativeRecordingMock::traceCount;
 using NativeRecordingMock::traceIndex;
+using NativeRecordingMock::waitListSizes;
+
+namespace {
+// Submits a kernel that names DepEvent as a dependency, so that the dependency
+// reaches Command::getUrEvents() and can be dropped there.
+sycl::event submitAfter(sycl::queue &Q, const sycl::event &DepEvent) {
+  return Q.submit([&](sycl::handler &CGH) {
+    CGH.depends_on(DepEvent);
+    CGH.single_task<TestKernel>([]() {});
+  });
+}
+} // namespace
 
 // Traces UR recording layer
 TEST_F(NativeRecordingTest, RecordingUrTrace) {
@@ -219,8 +233,7 @@ TEST_F(NativeRecordingTest, PotentiallyNativeRecordedEvents) {
   Graph.begin_recording(Queue);
   expectRecorded(Queue, true);
   // The flag is per context and assumes a direct native submission could
-  // transition the recording, so all queue submissions are this point are
-  // potentially native recorded.
+  // transition the recording.
   expectRecorded(ExecutingQueue, true);
 
   Graph.end_recording(Queue);
@@ -229,10 +242,99 @@ TEST_F(NativeRecordingTest, PotentiallyNativeRecordedEvents) {
   sycl::free(DevPtr, Queue);
 }
 
-// Recordings from queues in the same context are counted, so the context stays
-// active until the last recording ends. The counter walks 0 -> 1 -> 2 -> 1 -> 0
-// here, of which isNativeRecordingActive() exposes "non-zero".
-TEST_F(NativeRecordingTest, ContextRecordingActive) {
+TEST_F(NativeRecordingTest, PotentiallyNativeRecordedEventsOtherContext) {
+  sycl::context OtherContext{Dev};
+  sycl::queue OtherQueue{
+      OtherContext, Dev, {sycl::property::queue::in_order{}}};
+  ASSERT_NE(OtherQueue.get_context(), Queue.get_context());
+
+  auto Graph = makeGraph();
+  Graph.begin_recording(Queue);
+  auto Unrelated = OtherQueue.submit(
+      [&](sycl::handler &CGH) { CGH.single_task<TestKernel>([]() {}); });
+  Graph.end_recording(Queue);
+
+  EXPECT_FALSE(getSyclObjImpl(Unrelated)->isPotentiallyNativeRecorded());
+}
+
+// The flag is read by Command::getUrEvents() when the dependent command is
+// enqueued, which can be long after the recording ended, so ending the
+// recording must not clear it.
+TEST_F(NativeRecordingTest, PotentiallyNativeRecordedEventsOutliveRecording) {
+  auto Graph = makeGraph();
+
+  Graph.begin_recording(Queue);
+  auto Recorded = Queue.submit(
+      [&](sycl::handler &CGH) { CGH.single_task<TestKernel>([]() {}); });
+  ASSERT_TRUE(getSyclObjImpl(Recorded)->isPotentiallyNativeRecorded());
+
+  Graph.end_recording(Queue);
+  EXPECT_TRUE(getSyclObjImpl(Recorded)->isPotentiallyNativeRecorded());
+}
+
+TEST_F(NativeRecordingTest, PotentiallyNativeRecordedReusableEvent) {
+  auto Graph = makeGraph();
+  auto Reusable = experimental::make_event(Queue.get_context());
+
+  experimental::enqueue_signal_event(Queue, Reusable);
+  EXPECT_FALSE(getSyclObjImpl(Reusable)->isPotentiallyNativeRecorded());
+
+  Graph.begin_recording(Queue);
+  experimental::enqueue_signal_event(Queue, Reusable);
+  EXPECT_TRUE(getSyclObjImpl(Reusable)->isPotentiallyNativeRecorded());
+  Graph.end_recording(Queue);
+
+  experimental::enqueue_signal_event(Queue, Reusable);
+  EXPECT_FALSE(getSyclObjImpl(Reusable)->isPotentiallyNativeRecorded());
+}
+
+TEST_F(NativeRecordingTest, ExternalSignalDepReachesUr) {
+  auto Graph = makeGraph();
+
+  Graph.begin_recording(Queue);
+  auto Recorded = Queue.submit(
+      [&](sycl::handler &CGH) { CGH.single_task<TestKernel>([]() {}); });
+  Graph.end_recording(Queue);
+
+  ASSERT_EQ(waitListSizes("urEnqueueKernelLaunchWithArgsExp"),
+            (std::vector<uint32_t>{0u}));
+
+  submitAfter(Queue, Recorded);
+  EXPECT_EQ(waitListSizes("urEnqueueKernelLaunchWithArgsExp"),
+            (std::vector<uint32_t>{0u, 1u}));
+}
+
+TEST_F(NativeRecordingTest, ExternalWaitDepReachesUr) {
+  auto Graph = makeGraph();
+  auto BeforeRecording = Queue.submit(
+      [&](sycl::handler &CGH) { CGH.single_task<TestKernel>([]() {}); });
+  ASSERT_FALSE(getSyclObjImpl(BeforeRecording)->isPotentiallyNativeRecorded());
+
+  Graph.begin_recording(Queue);
+  submitAfter(Queue, BeforeRecording);
+  Graph.end_recording(Queue);
+
+  EXPECT_EQ(waitListSizes("urEnqueueKernelLaunchWithArgsExp"),
+            (std::vector<uint32_t>{0u, 1u}));
+}
+
+TEST_F(NativeRecordingTest, UnrecordedEventDepStillDropped) {
+  auto BeforeRecording = Queue.submit(
+      [&](sycl::handler &CGH) { CGH.single_task<TestKernel>([]() {}); });
+  {
+    auto Graph = makeGraph();
+    Graph.begin_recording(Queue);
+    Graph.end_recording(Queue);
+  }
+  ASSERT_FALSE(getSyclObjImpl(BeforeRecording)->isPotentiallyNativeRecorded());
+
+  submitAfter(Queue, BeforeRecording);
+
+  EXPECT_EQ(waitListSizes("urEnqueueKernelLaunchWithArgsExp"),
+            (std::vector<uint32_t>{0u, 0u}));
+}
+
+TEST_F(NativeRecordingTest, ContextMultipleRecordingsActive) {
   sycl::queue SecondQueue{Dev, {sycl::property::queue::in_order{}}};
   sycl::detail::context_impl &Ctx = *getSyclObjImpl(Queue.get_context());
   ASSERT_EQ(SecondQueue.get_context(), Queue.get_context());
@@ -281,7 +383,6 @@ TEST_F(NativeRecordingTest, ContextRecordingActiveQueueDestroyed) {
   EXPECT_FALSE(Ctx.isNativeRecordingActive());
 }
 
-// Recording a graph without native support enabled leaves the context inactive.
 TEST_F(NativeRecordingTest, ContextRecordingActiveNonNativeGraph) {
   sycl::context SyclCtx = Queue.get_context();
   sycl::detail::context_impl &Ctx = *getSyclObjImpl(SyclCtx);
@@ -289,13 +390,9 @@ TEST_F(NativeRecordingTest, ContextRecordingActiveNonNativeGraph) {
 
   Graph.begin_recording(Queue);
   EXPECT_FALSE(Ctx.isNativeRecordingActive());
-
   Graph.end_recording(Queue);
-  EXPECT_FALSE(Ctx.isNativeRecordingActive());
-  EXPECT_EQ(traceCount("urQueueBeginCaptureIntoGraphExp"), 0u);
 }
 
-// A failed begin capture must leave the counter at zero.
 TEST_F(NativeRecordingTest, ContextRecordingActiveBeginFailure) {
   sycl::detail::context_impl &Ctx = *getSyclObjImpl(Queue.get_context());
   auto Graph = makeGraph();
@@ -307,16 +404,30 @@ TEST_F(NativeRecordingTest, ContextRecordingActiveBeginFailure) {
   EXPECT_FALSE(Ctx.isNativeRecordingActive());
 }
 
-// End capture reporting a failure after the queue already left capture mode
-// still takes the counter back to zero.
-TEST_F(NativeRecordingTest, ContextRecordingActiveEndFailure) {
+TEST_F(NativeRecordingTest, ContextRecordingActiveEndCaptureWithFailure) {
   sycl::detail::context_impl &Ctx = *getSyclObjImpl(Queue.get_context());
   auto Graph = makeGraph();
 
   Graph.begin_recording(Queue);
   ASSERT_TRUE(Ctx.isNativeRecordingActive());
 
-  FAIL_UR_AFTER(urQueueEndGraphCaptureExp, UR_RESULT_ERROR_INVALID_QUEUE);
+  FAIL_UR_AFTER(urQueueEndGraphCaptureExp, UR_RESULT_ERROR_UNJOINED_FORK);
+  expectFailure([&]() { Graph.end_recording(Queue); },
+                UR_RESULT_ERROR_UNJOINED_FORK);
+  EXPECT_FALSE(Ctx.isNativeRecordingActive());
+  EXPECT_EQ(Queue.ext_oneapi_get_state(), experimental::queue_state::executing);
+}
+
+// An unlikely scenario but we should not falsely decrement the count if
+// recording never truly ended.
+TEST_F(NativeRecordingTest, ContextRecordingActiveEndCaptureWithFailure) {
+  sycl::detail::context_impl &Ctx = *getSyclObjImpl(Queue.get_context());
+  auto Graph = makeGraph();
+
+  Graph.begin_recording(Queue);
+  ASSERT_TRUE(Ctx.isNativeRecordingActive());
+
+  FAIL_UR_BEFORE(urQueueEndGraphCaptureExp, UR_RESULT_ERROR_INVALID_QUEUE);
   expectFailure([&]() { Graph.end_recording(Queue); },
                 UR_RESULT_ERROR_INVALID_QUEUE);
   EXPECT_FALSE(Ctx.isNativeRecordingActive());

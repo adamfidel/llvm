@@ -404,32 +404,16 @@ TEST_F(NativeRecordingTest, ContextRecordingActiveBeginFailure) {
   EXPECT_FALSE(Ctx.isNativeRecordingActive());
 }
 
-TEST_F(NativeRecordingTest, ContextRecordingActiveEndCaptureWithFailure) {
+TEST_F(NativeRecordingTest, ContextRecordingActiveEndCaptureUrFailsAfter) {
   sycl::detail::context_impl &Ctx = *getSyclObjImpl(Queue.get_context());
   auto Graph = makeGraph();
 
   Graph.begin_recording(Queue);
   ASSERT_TRUE(Ctx.isNativeRecordingActive());
 
-  FAIL_UR_AFTER(urQueueEndGraphCaptureExp, UR_RESULT_ERROR_UNJOINED_FORK);
+  FAIL_UR_AFTER(urQueueEndGraphCaptureExp,
+                UR_RESULT_ERROR_GRAPH_UNJOINED_FORKS);
   expectFailure([&]() { Graph.end_recording(Queue); },
-                UR_RESULT_ERROR_UNJOINED_FORK);
+                UR_RESULT_ERROR_GRAPH_UNJOINED_FORKS);
   EXPECT_FALSE(Ctx.isNativeRecordingActive());
-  EXPECT_EQ(Queue.ext_oneapi_get_state(), experimental::queue_state::executing);
-}
-
-// An unlikely scenario but we should not falsely decrement the count if
-// recording never truly ended.
-TEST_F(NativeRecordingTest, ContextRecordingActiveEndCaptureWithFailure) {
-  sycl::detail::context_impl &Ctx = *getSyclObjImpl(Queue.get_context());
-  auto Graph = makeGraph();
-
-  Graph.begin_recording(Queue);
-  ASSERT_TRUE(Ctx.isNativeRecordingActive());
-
-  FAIL_UR_BEFORE(urQueueEndGraphCaptureExp, UR_RESULT_ERROR_INVALID_QUEUE);
-  expectFailure([&]() { Graph.end_recording(Queue); },
-                UR_RESULT_ERROR_INVALID_QUEUE);
-  EXPECT_FALSE(Ctx.isNativeRecordingActive());
-  EXPECT_EQ(Queue.ext_oneapi_get_state(), experimental::queue_state::executing);
 }

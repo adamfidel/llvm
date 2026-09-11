@@ -1064,8 +1064,6 @@ queue_impl::submitMemOpHelper(const std::vector<event> &DepEvents,
       }
 
       EventImplPtr ResEventImpl = prepareSYCLEventAssociatedWithQueue(*this);
-      ResEventImpl->setPotentiallyNativeRecorded(
-          getContextImpl().isNativeRecordingActive());
       {
         NestedCallsTracker tracker;
         ur_event_handle_t UREvent = nullptr;
@@ -1074,6 +1072,8 @@ queue_impl::submitMemOpHelper(const std::vector<event> &DepEvents,
                   getUrEvents(ExpandedDepEvents), &UREvent);
         ResEventImpl->setHandle(UREvent);
         ResEventImpl->setEnqueued();
+        ResEventImpl->setPotentiallyNativeRecorded(
+            getContextImpl().isNativeRecordingActive());
         // connect returned event with dependent events
         if (!isInOrder()) {
           std::vector<EventImplPtr> &ExpandedDepEventImplPtrs =

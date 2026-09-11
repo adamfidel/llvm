@@ -177,6 +177,58 @@ TEST_F(NativeRecordingTest, GetStateUrTrace) {
   EXPECT_GE(traceCount("urQueueIsGraphCaptureEnabledExp"), 3u);
 }
 
+// Events are flagged as potentially recorded to provide better error messaging
+// on invalid cross capture dependencies
+TEST_F(NativeRecordingTest, PotentiallyNativeRecordedEvents) {
+  sycl::queue ExecutingQueue{
+      Queue.get_context(), Dev, {sycl::property::queue::in_order{}}};
+  int HostVal = 42;
+  int *DevPtr = sycl::malloc_device<int>(1, Queue);
+  auto Graph = makeGraph();
+
+  auto submitOps = [&](sycl::queue &Q) {
+    return std::vector<std::pair<std::string, sycl::event>>{
+        {"barrier handler",
+         Q.submit([&](sycl::handler &CGH) { CGH.ext_oneapi_barrier(); })},
+        {"barrier shortcut", Q.ext_oneapi_submit_barrier()},
+        {"fill handler",
+         Q.submit([&](sycl::handler &CGH) { CGH.fill(DevPtr, 0, 1); })},
+        {"fill shortcut", Q.fill(DevPtr, 0, 1)},
+        {"memset handler", Q.submit([&](sycl::handler &CGH) {
+           CGH.memset(DevPtr, 0, sizeof(int));
+         })},
+        {"memset shortcut", Q.memset(DevPtr, 0, sizeof(int))},
+        {"memcpy handler", Q.submit([&](sycl::handler &CGH) {
+           CGH.memcpy(DevPtr, &HostVal, sizeof(int));
+         })},
+        {"memcpy shortcut", Q.memcpy(DevPtr, &HostVal, sizeof(int))},
+        {"kernel handler", Q.submit([&](sycl::handler &CGH) {
+           CGH.single_task<TestKernel>([]() {});
+         })},
+        {"kernel shortcut", Q.single_task<TestKernel>([]() {})}};
+  };
+
+  auto expectRecorded = [&](sycl::queue &Q, bool Expected) {
+    for (const auto &[Name, Event] : submitOps(Q))
+      EXPECT_EQ(getSyclObjImpl(Event)->isPotentiallyNativeRecorded(), Expected)
+          << Name;
+  };
+
+  expectRecorded(Queue, false);
+
+  Graph.begin_recording(Queue);
+  expectRecorded(Queue, true);
+  // The flag is per context and assumes a direct native submission could
+  // transition the recording, so all queue submissions are this point are
+  // potentially native recorded.
+  expectRecorded(ExecutingQueue, true);
+
+  Graph.end_recording(Queue);
+  expectRecorded(Queue, false);
+
+  sycl::free(DevPtr, Queue);
+}
+
 // Recordings from queues in the same context are counted, so the context stays
 // active until the last recording ends. The counter walks 0 -> 1 -> 2 -> 1 -> 0
 // here, of which isNativeRecordingActive() exposes "non-zero".
@@ -189,53 +241,17 @@ TEST_F(NativeRecordingTest, ContextRecordingActive) {
   auto SecondGraph = makeGraph();
   EXPECT_FALSE(Ctx.isNativeRecordingActive());
 
-  sycl::event BeforeCaptureHandler = Queue.submit(
-      [&](sycl::handler &CGH) { CGH.single_task<TestKernel>([]() {}); });
-  sycl::event BeforeCapture = Queue.single_task<TestKernel>([]() {});
-  EXPECT_FALSE(
-      getSyclObjImpl(BeforeCaptureHandler)->isPotentiallyNativeRecorded());
-  EXPECT_FALSE(getSyclObjImpl(BeforeCapture)->isPotentiallyNativeRecorded());
-
   Graph.begin_recording(Queue);
   EXPECT_TRUE(Ctx.isNativeRecordingActive());
 
   SecondGraph.begin_recording(SecondQueue);
   EXPECT_TRUE(Ctx.isNativeRecordingActive());
 
-  int HostVal = 42;
-  int *DevPtr = sycl::malloc_device<int>(1, Queue);
-
-  // Each operation is recorded through the handler and through the queue
-  // shortcut, which reach UR by different paths.
-  sycl::event BarrierHandler =
-      Queue.submit([&](sycl::handler &CGH) { CGH.ext_oneapi_barrier(); });
-  sycl::event Barrier = Queue.ext_oneapi_submit_barrier();
-  sycl::event FillHandler =
-      Queue.submit([&](sycl::handler &CGH) { CGH.fill(DevPtr, 0, 1); });
-  sycl::event Fill = Queue.fill(DevPtr, 0, 1);
-  sycl::event MemcpyHandler = Queue.submit(
-      [&](sycl::handler &CGH) { CGH.memcpy(DevPtr, &HostVal, sizeof(int)); });
-  sycl::event Memcpy = Queue.memcpy(DevPtr, &HostVal, sizeof(int));
-  sycl::event KernelHandler = Queue.submit(
-      [&](sycl::handler &CGH) { CGH.single_task<TestKernel>([]() {}); });
-  sycl::event Kernel = Queue.single_task<TestKernel>([]() {});
-
-  EXPECT_TRUE(getSyclObjImpl(BarrierHandler)->isPotentiallyNativeRecorded());
-  EXPECT_TRUE(getSyclObjImpl(Barrier)->isPotentiallyNativeRecorded());
-  EXPECT_TRUE(getSyclObjImpl(FillHandler)->isPotentiallyNativeRecorded());
-  EXPECT_TRUE(getSyclObjImpl(Fill)->isPotentiallyNativeRecorded());
-  EXPECT_TRUE(getSyclObjImpl(MemcpyHandler)->isPotentiallyNativeRecorded());
-  EXPECT_TRUE(getSyclObjImpl(Memcpy)->isPotentiallyNativeRecorded());
-  EXPECT_TRUE(getSyclObjImpl(KernelHandler)->isPotentiallyNativeRecorded());
-  EXPECT_TRUE(getSyclObjImpl(Kernel)->isPotentiallyNativeRecorded());
-
   Graph.end_recording(Queue);
   EXPECT_TRUE(Ctx.isNativeRecordingActive());
 
   SecondGraph.end_recording(SecondQueue);
   EXPECT_FALSE(Ctx.isNativeRecordingActive());
-
-  sycl::free(DevPtr, Queue);
 }
 
 // A recording left open when the graph is destroyed still ends on the context.

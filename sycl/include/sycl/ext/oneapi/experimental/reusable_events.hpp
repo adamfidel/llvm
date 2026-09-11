@@ -40,10 +40,6 @@ inline bool operator!=(const enable_profiling &lhs,
   return !(lhs == rhs);
 }
 
-/// Marks an enqueued signal or wait operation as external to a graph being
-/// recorded on the queue. An external wait becomes a graph input which the host
-/// must signal before each replay, and an external signal becomes a graph
-/// output which can be observed from outside the graph.
 struct graph_external
     : detail::run_time_property_key<graph_external,
                                     detail::PropKind::GraphExternal> {

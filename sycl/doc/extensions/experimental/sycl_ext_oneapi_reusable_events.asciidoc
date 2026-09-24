@@ -390,10 +390,12 @@ the graph, and it is re-evaluated each time the executable graph is submitted:
   `evts` at the time the executable graph is submitted have completed.
   If the event is not associated with a new signal between two submissions of
   the executable graph, the later submission waits on the same association as
-  the earlier one. In the case of the first submission, its status is
+  the earlier one. If no signal has ever been associated with the event before
+  the first submission, its initial status is
   `info::event_command_status::complete` and no work is waited on.
-* For `enqueue_signal_event`, `evt` is disassociated from any previous command
-  each time the executable graph is submitted and its status becomes
+* For `enqueue_signal_event`, each submission of the executable graph
+  immediately disassociates `evt` from any previous command and sets its status
+  to `info::event_command_status::submitted`. Its status becomes
   `info::event_command_status::complete` once all nodes on which that node
   depends have completed.
   A command submitted to another queue or a host wait on `evt` therefore

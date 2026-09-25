@@ -378,6 +378,14 @@ where a graph is defined by the
 link:../experimental/sycl_ext_oneapi_graph.asciidoc[sycl_ext_oneapi_graph]
 extension.
 
+If this property is not used, then reusable event synchronization is subject
+to the 
+link:../experimental/sycl_ext_oneapi_graph.asciidoc#event-limitations[
+Event Limitations] section of the graph specification.
+
+The `graph_external` property enables the event wait and signal operations
+described below to cross this boundary.
+
 _Effects_ (1): Creates a new `graph_external` property with a boolean value
 indicating whether the operation may cross the graph boundary.
 

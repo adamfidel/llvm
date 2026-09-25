@@ -378,16 +378,19 @@ where a graph is defined by the
 link:../experimental/sycl_ext_oneapi_graph.asciidoc[sycl_ext_oneapi_graph]
 extension.
 
-If this property is not used, then reusable event synchronization is subject
-to the 
-link:../experimental/sycl_ext_oneapi_graph.asciidoc#event-limitations[
-Event Limitations] section of the graph specification.
-
-The `graph_external` property enables the event wait and signal operations
-described below to cross this boundary.
-
 _Effects_ (1): Creates a new `graph_external` property with a boolean value
 indicating whether the operation may cross the graph boundary.
+
+_Throws:_
+
+ * An `exception` with an implementation defined error code if the `graph_external`
+   property has the value `true` and `q` is not in the
+   `queue_state::recording` state.
+
+If this property is not used, then reusable event synchronization across the capture boundary
+is subject to the
+link:../experimental/sycl_ext_oneapi_graph.asciidoc#event-limitations[
+Event Limitations] section of the graph specification.
 
 '''
 
@@ -410,12 +413,6 @@ When this property has the value `false`, the operation behaves as if no
 It is undefined behavior to destroy a reusable event used as a graph external signal
 or wait prior to destroying its associated modifiable and executable `command_graph`
 objects.
-
-_Throws:_
-
- * An `exception` with an implementation defined error code if the `graph_external`
-   property has the value `true` and `q` is not in the
-   `queue_state::recording` state.
 
 === Interaction with other event APIs
 

@@ -279,17 +279,17 @@ _Constraints:_
   than those listed below in section "New property for enqueuing event
   operations".
 
+_Throws:_
+
+* An `exception` with an implementation defined error code if `graph_external` is 
+  provided as a property with value `true` and `q` is not in the `queue_state::recording` state.
+
 _Effects:_ Enqueues a special barrier to `q` with the following semantic.
 Any commands submitted to the queue after this barrier cannot begin execution
 until all commands associated with `evt` or `evts` have completed.
 
 _Remarks:_ The event `evt` and the events in `evts` do _not_ need to have the
 same context as `q`.
-
-_Throws:_
-
-* An `exception` with the `errc::invalid` error code if `graph_external` has
-  the value `true` and `q` is not in the `queue_state::recording` state.
 
 '''
 
@@ -310,6 +310,12 @@ _Constraints:_
 * `is_property_list_v<PropertyListT>` is `true` and contains no properties other
   than those listed below in section "New property for enqueuing event
   operations".
+
+_Throws:_
+
+* An `exception` with an implementation defined error code if `graph_external` is 
+  provided as a property with value `true` and `q` is not in the `queue_state::recording` state.
+
 
 _Effects:_ The event `evt` is immediately disassociated with any previous
 command, and its status is set to `info::event_command_status::submitted`.
@@ -388,12 +394,12 @@ extension.
 _Effects_ (1): Creates a new `graph_external` property with a boolean value
 indicating whether the operation may cross the graph boundary.
 
+'''
+
 If this property is not used, then reusable event synchronization across the capture boundary
 is subject to the
 link:../experimental/sycl_ext_oneapi_graph.asciidoc#event-limitations[
 Event Limitations] section of the graph specification.
-
-=== Graph recording and replay
 
 When this property has the value `true`, the operation is recorded as a node of
 the graph:

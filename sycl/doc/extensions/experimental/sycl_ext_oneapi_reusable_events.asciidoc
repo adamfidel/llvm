@@ -45,6 +45,8 @@ This extension also depends on the following other SYCL extensions:
 
 * link:../experimental/sycl_ext_oneapi_properties.asciidoc[
   sycl_ext_oneapi_properties]
+* link:../experimental/sycl_ext_oneapi_graph.asciidoc[
+  sycl_ext_oneapi_graph]
 
 
 == Status
@@ -253,17 +255,37 @@ need to have this aspect.
 This extension adds the following free functions which submit operations related
 to events onto a queue.
 
+When recorded in a `command_graph` without `graph_external{true}`, these
+operations may only synchronize with work in that graph.
+
 '''
 
 [source,c++]
 ----
 namespace sycl::ext::oneapi::experimental {
 
-void enqueue_wait_event(queue q, const event& evt);
-void enqueue_wait_events(queue q, const std::vector<event>& evts);
+template<typename PropertyListT = empty_properties_t>
+void enqueue_wait_event(queue q, const event& evt, PropertyListT props = {});
+
+template<typename PropertyListT = empty_properties_t>
+void enqueue_wait_events(queue q, const std::vector<event>& evts,
+                         PropertyListT props = {});
 
 } // namespace sycl::ext::oneapi::experimental
 ----
+
+_Constraints:_
+
+* `PropertyListT` is one of the properties listed below in section "New property
+  for enqueuing event operations"; or
+* `is_property_list_v<PropertyListT>` is `true` and contains no properties other
+  than those listed below in section "New property for enqueuing event
+  operations".
+
+_Throws:_
+
+* An `exception` with an implementation defined error code if `graph_external` is 
+  provided as a property with value `true` and `q` is not in the `queue_state::recording` state.
 
 _Effects:_ Enqueues a special barrier to `q` with the following semantic.
 Any commands submitted to the queue after this barrier cannot begin execution
@@ -278,10 +300,25 @@ same context as `q`.
 ----
 namespace sycl::ext::oneapi::experimental {
 
-void enqueue_signal_event(queue q, event& evt);
+template<typename PropertyListT = empty_properties_t>
+void enqueue_signal_event(queue q, event& evt, PropertyListT props = {});
 
 } // namespace sycl::ext::oneapi::experimental
 ----
+
+_Constraints:_
+
+* `PropertyListT` is one of the properties listed below in section "New property
+  for enqueuing event operations"; or
+* `is_property_list_v<PropertyListT>` is `true` and contains no properties other
+  than those listed below in section "New property for enqueuing event
+  operations".
+
+_Throws:_
+
+* An `exception` with an implementation defined error code if `graph_external` is 
+  provided as a property with value `true` and `q` is not in the `queue_state::recording` state.
+
 
 _Effects:_ The event `evt` is immediately disassociated with any previous
 command, and its status is set to `info::event_command_status::submitted`.
@@ -327,6 +364,57 @@ _Throws:_
    was created with the `enable_profiling` property that enables profiling
    timestamps and if the device associated with `q` does not have
    `aspect::ext_oneapi_per_event_profiling`.
+ * An `exception` with the `errc::invalid` error code if `graph_external` has
+   the value `true` and `q` is not in the `queue_state::recording` state.
+
+'''
+
+=== New property for enqueuing event operations [[graph-external-property]]
+
+This extension adds the following property, which can be used with
+`enqueue_wait_event`, `enqueue_wait_events` and `enqueue_signal_event`:
+
+'''
+
+[source,c++]
+----
+namespace sycl::ext::oneapi::experimental {
+
+struct graph_external {
+  graph_external(bool enable = true);  (1)
+};
+using graph_external_key = graph_external;
+
+} // namespace sycl::ext::oneapi::experimental
+----
+
+The `graph_external` property lets reusable event waits and signals recorded
+in a `command_graph` to synchronize with work outside it. `command_graph` is defined by the
+link:../experimental/sycl_ext_oneapi_graph.asciidoc[sycl_ext_oneapi_graph]
+extension.
+
+_Effects_ (1): Creates a new `graph_external` property with a boolean value
+indicating whether the operation may cross the graph boundary.
+
+'''
+
+When this property has the value `true`, the operation is recorded as a node of
+the graph:
+
+*  At graph submission, the node defined by `enqueue_wait_event` or `enqueue_wait_events`
+   selects each recorded event's latest signal for synchronization. During replay, it
+   waits until those signals complete.
+* `enqueue_signal_event` signals the captured event that can be synchronized by the host or device
+   outside the graph. The recorded event becomes `info::event_command_status::submitted`
+   at graph submission and `info::event_command_status::complete` when the
+   signal runs during replay.
+
+When this property has the value `false`, the operation behaves as if no
+`graph_external` property was provided.
+
+It is undefined behavior to destroy a reusable event used as a graph external signal
+or wait prior to destroying its associated modifiable and executable `command_graph`
+objects.
 
 === Interaction with other event APIs
 
@@ -427,6 +515,129 @@ int main() {
     end.get_profiling_info<sycl::info::event_profiling::command_start>() -
     start.get_profiling_info<sycl::info::event_profiling::command_end>();
   std::cout << "Execution time: " << elapsed << " (nanoseconds)\n";
+}
+----
+
+
+=== Synchronizing with a graph from outside the graph
+
+[source,c++]
+----
+#include <sycl/sycl.hpp>
+namespace syclex = sycl::ext::oneapi::experimental;
+
+static constexpr size_t N = 1024;
+
+int main() {
+  sycl::device dev;
+  sycl::context ctxt = dev.get_platform().khr_get_default_context();
+  sycl::queue q_graph{ctxt, dev, sycl::property::queue::in_order{}};
+  sycl::queue q_eager{ctxt, dev, sycl::property::queue::in_order{}};
+
+  // The events are created outside of the graph so that they outlive it.
+  sycl::event eager_event = syclex::make_event(ctxt);
+  sycl::event graph_event = syclex::make_event(ctxt);
+
+  // `graph_external` requires a graph which uses native recording.
+  syclex::command_graph graph{
+      ctxt, dev, {syclex::property::graph::enable_native_recording{}}};
+  graph.begin_recording(q_graph);
+
+  // Wait for a signal which is produced outside of the graph.
+  syclex::enqueue_wait_event(q_graph, eager_event,
+                             syclex::properties{syclex::graph_external{}});
+
+  syclex::parallel_for(q_graph, sycl::range{N}, [=](sycl::item<> it) { /* ... */ });
+
+  // Signal an event which is observed outside of the graph.
+  syclex::enqueue_signal_event(q_graph, graph_event,
+                               syclex::properties{syclex::graph_external{}});
+
+  syclex::parallel_for(q_graph, sycl::range{N}, [=](sycl::item<> it) { /* ... */ });
+
+  graph.end_recording();
+  auto exec = graph.finalize();
+
+  for (int i = 0; i < 2; ++i) {
+    syclex::parallel_for(q_eager, sycl::range{N}, [=](sycl::item<> it) { /* ... */ });
+    syclex::enqueue_signal_event(q_eager, eager_event);
+
+    sycl::event graph_submission = q_graph.ext_oneapi_graph(exec);
+
+    // The external signal can complete before the rest of the graph.
+    graph_event.wait();
+    graph_submission.wait();
+  }
+}
+----
+
+
+=== Timing a region of a graph
+
+[source,c++]
+----
+#include <iostream>
+#include <sycl/sycl.hpp>
+namespace syclex = sycl::ext::oneapi::experimental;
+
+static constexpr size_t N = 1024;
+
+int main() {
+  sycl::device dev;
+  sycl::context ctxt = dev.get_platform().khr_get_default_context();
+  sycl::queue q{ctxt, dev, sycl::property::queue::in_order{}};
+
+  if (!dev.has(sycl::aspect::ext_oneapi_per_event_profiling)) {
+    std::cout << "Cannot time a graph region without per-event profiling "
+                 "support\n";
+    return 0;
+  }
+
+  // Only these two events capture timestamps, so profiling is not enabled for
+  // the rest of the graph.
+  sycl::event start = syclex::make_event(ctxt, syclex::enable_profiling{true});
+  sycl::event end = syclex::make_event(ctxt, syclex::enable_profiling{true});
+
+  syclex::command_graph graph{
+      ctxt, dev, {syclex::property::graph::enable_native_recording{}}};
+  graph.begin_recording(q);
+
+  syclex::parallel_for(q, sycl::range{N}, [=](sycl::item<> it) { /* untimed */ });
+
+  // Start of the timed region.
+  syclex::enqueue_signal_event(q, start,
+                               syclex::properties{syclex::graph_external{}});
+
+  syclex::parallel_for(q, sycl::range{N}, [=](sycl::item<> it) { /* timed */ });
+  syclex::parallel_for(q, sycl::range{N}, [=](sycl::item<> it) { /* timed */ });
+
+  // End of the timed region.
+  syclex::enqueue_signal_event(q, end,
+                               syclex::properties{syclex::graph_external{}});
+
+  syclex::parallel_for(q, sycl::range{N}, [=](sycl::item<> it) { /* untimed */ });
+
+  graph.end_recording();
+  auto exec = graph.finalize();
+
+  for (int i = 0; i < 3; ++i) {
+    sycl::event graph_submission = q.ext_oneapi_graph(exec);
+
+    // Each submission re-signals `start` and `end`, so their timestamps must be
+    // read before the executable graph is submitted again. Waiting on `end`
+    // does not wait for the untimed kernel which follows it.
+    end.wait();
+
+    // The start and end timestamps of a signaled event are equal, so either
+    // one can be used. The start timestamps are used here for both events.
+    uint64_t elapsed =
+        end.get_profiling_info<sycl::info::event_profiling::command_start>() -
+        start.get_profiling_info<sycl::info::event_profiling::command_start>();
+    std::cout << "Timed region of submission " << i << ": " << elapsed
+              << " (nanoseconds)\n";
+
+    graph_submission.wait();
+  }
 }
 ----
 
@@ -559,3 +770,6 @@ two is the case, it must not rely on either outcome.
   is undefined. This case is never diagnosed, because the implementation does
   not currently differentiate between events enqueued for signaling using
   `enqueue_signal_event` and regular events produced during command submission.
+* An `exception` with the `errc::feature_not_supported` error code is thrown if
+  if the reuable event submission is recorded in a `command_graph` that was
+  not created with the `property::graph::enable_native_recording` property.

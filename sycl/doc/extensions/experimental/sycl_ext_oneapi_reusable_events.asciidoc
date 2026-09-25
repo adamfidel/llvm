@@ -372,10 +372,11 @@ using graph_external_key = graph_external;
 } // namespace sycl::ext::oneapi::experimental
 ----
 
-This property controls whether the "event wait" or "event signal" operation may
-cross the boundary of the graph which is being recorded, where a graph is
-defined by the link:../experimental/sycl_ext_oneapi_graph.asciidoc[
-sycl_ext_oneapi_graph] extension.
+This property controls whether the event wait or event signal operation may
+synchronize across the recording boundary of the graph which is being recorded,
+where a graph is defined by the
+link:../experimental/sycl_ext_oneapi_graph.asciidoc[sycl_ext_oneapi_graph]
+extension.
 
 _Effects_ (1): Creates a new `graph_external` property with a boolean value
 indicating whether the operation may cross the graph boundary.
@@ -383,39 +384,26 @@ indicating whether the operation may cross the graph boundary.
 '''
 
 When this property has the value `true`, the operation is recorded as a node of
-the graph, and it is re-evaluated each time the executable graph is submitted:
+the graph:
 
-* For `enqueue_wait_event` and `enqueue_wait_events`, the nodes dependent on
-  the wait event(s) cannot begin execution until the commands associated with `evt` or
-  `evts` at the time the executable graph is submitted have completed.
-  If the event is not associated with a new signal between two submissions of
-  the executable graph, the later submission waits on the same association as
-  the earlier one. If no signal has ever been associated with the event before
-  the first submission, its initial status is
-  `info::event_command_status::complete` and no work is waited on.
-* For `enqueue_signal_event`, each submission of the executable graph
-  immediately disassociates `evt` from any previous command and sets its status
-  to `info::event_command_status::submitted`. Its status becomes
-  `info::event_command_status::complete` once all nodes on which that node
-  depends have completed.
-  A command submitted to another queue or a host wait on `evt` therefore
-  synchronizes with the most recent submission of the executable graph.
-* It is valid for an application to synchronize between two executable graphs
-  by recording an `enqueue_signal_event` in one graph that is later waited
-  on by an `enqueue_wait_event` or `enqueue_wait_events` in the second graph.
+* `enqueue_wait_event` and `enqueue_wait_events` define graph nodes that
+   block until dependent event signals reach
+   `info::event_command_status::complete`. The wait is rebound
+   to block on the latest signal of each dependent event during graph
+   submission.
+* `enqueue_signal_event` defines a graph node that enables host or device
+   synchronization outside of the graph. The provided `evt` transitions
+   to state `info::event_command_status::submitted` upon graph submission
+   and transitions to `info::event_command_status::complete` during replay.
 
-This property is only supported for graphs which were created with the
-`property::graph::enable_native_recording` property.
+When this property has the value `false`, the operation behaves as if no
+`graph_external` property was provided.
 
 _Throws:_
 
- * An `exception` with the `errc::runtime` error code if the `graph_external`
+ * An `exception` with an implementation defined error code if the `graph_external`
    property has the value `true` and `q` is not in the
    `queue_state::recording` state.
- * An `exception` with the `errc::feature_not_supported` error code if the
-   `graph_external` property has the value `true` and the graph being recorded
-   was not created with the `property::graph::enable_native_recording`
-   property.
 
 === Interaction with other event APIs
 
@@ -770,3 +758,6 @@ two is the case, it must not rely on either outcome.
   is undefined. This case is never diagnosed, because the implementation does
   not currently differentiate between events enqueued for signaling using
   `enqueue_signal_event` and regular events produced during command submission.
+* An `exception` with the `errc::feature_not_supported` error code is thrown if
+  if the reuable event submission is recorded in a `command_graph` that was
+  not created with the `property::graph::enable_native_recording` property.

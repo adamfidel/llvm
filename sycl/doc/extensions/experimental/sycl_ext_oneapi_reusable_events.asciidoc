@@ -399,6 +399,10 @@ the graph:
 When this property has the value `false`, the operation behaves as if no
 `graph_external` property was provided.
 
+It is undefined behavior to destroy a reusable event used as a graph external signal
+or wait prior to destroying its associated modifiable and executable `command_graph`
+objects.
+
 _Throws:_
 
  * An `exception` with an implementation defined error code if the `graph_external`

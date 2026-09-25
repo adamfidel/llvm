@@ -255,6 +255,9 @@ need to have this aspect.
 This extension adds the following free functions which submit operations related
 to events onto a queue.
 
+When recorded in a `command_graph` without `graph_external{true}`, these
+operations may only synchronize with work in that graph.
+
 '''
 
 [source,c++]
@@ -385,9 +388,8 @@ using graph_external_key = graph_external;
 } // namespace sycl::ext::oneapi::experimental
 ----
 
-This property controls whether the event wait or event signal operation may
-synchronize across the recording boundary of the graph which is being recorded,
-where a graph is defined by the
+The `graph_external` property lets reusable event waits and signals recorded
+in a `command_graph` to synchronize with work outside it. `command_graph` is defined by the
 link:../experimental/sycl_ext_oneapi_graph.asciidoc[sycl_ext_oneapi_graph]
 extension.
 
@@ -396,22 +398,16 @@ indicating whether the operation may cross the graph boundary.
 
 '''
 
-If this property is not used, then reusable event synchronization across the capture boundary
-is subject to the
-link:../experimental/sycl_ext_oneapi_graph.asciidoc#event-limitations[
-Event Limitations] section of the graph specification.
-
 When this property has the value `true`, the operation is recorded as a node of
 the graph:
 
-* `enqueue_wait_event` and `enqueue_wait_events` synchronize on events signaled
-   prior to graph submission. The graph node blocks until the provided event(s)
-   transition to `info::event_command_status::complete` status.
-* `enqueue_signal_event` defines a graph node that enables host or device
-   synchronization outside of the graph. The provided `evt` transitions
-   to state `info::event_command_status::submitted` during graph submission
-   and transitions to `info::event_command_status::complete` after device
-   completion during graph replay.
+*  At graph submission, `enqueue_wait_event` and `enqueue_wait_events` select
+   each event's latest signal for synchronization. During replay, the node
+   waits until those signals complete.
+* `enqueue_signal_event` signals an event that can be synchronized by the host or device
+   outside the graph. The event becomes `info::event_command_status::submitted`
+   at graph submission and `info::event_command_status::complete` when the
+   signal runs during replay.
 
 When this property has the value `false`, the operation behaves as if no
 `graph_external` property was provided.

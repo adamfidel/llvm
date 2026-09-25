@@ -2733,6 +2733,13 @@ will throw an exception if attempted:
 
 |===
 
+Reusable events passed to `enqueue_wait_event`, `enqueue_wait_events`, or
+`enqueue_signal_event` with `graph_external{true}` may synchronize with work
+outside a native-recorded graph. Their behavior is defined by
+link:../experimental/sycl_ext_oneapi_reusable_events.asciidoc#graph-recording-and-replay[
+sycl_ext_oneapi_reusable_events]. The restriction above applies to events
+returned by ordinary submissions captured in the graph.
+
 === Backend Requirements
 
 Native recording requires backend support for native graph

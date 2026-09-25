@@ -286,6 +286,11 @@ until all commands associated with `evt` or `evts` have completed.
 _Remarks:_ The event `evt` and the events in `evts` do _not_ need to have the
 same context as `q`.
 
+_Throws:_
+
+* An `exception` with the `errc::invalid` error code if `graph_external` has
+  the value `true` and `q` is not in the `queue_state::recording` state.
+
 '''
 
 [source,c++]
@@ -350,6 +355,8 @@ _Throws:_
    was created with the `enable_profiling` property that enables profiling
    timestamps and if the device associated with `q` does not have
    `aspect::ext_oneapi_per_event_profiling`.
+ * An `exception` with the `errc::invalid` error code if `graph_external` has
+   the value `true` and `q` is not in the `queue_state::recording` state.
 
 '''
 
@@ -381,18 +388,12 @@ extension.
 _Effects_ (1): Creates a new `graph_external` property with a boolean value
 indicating whether the operation may cross the graph boundary.
 
-_Throws:_
-
- * An `exception` with an implementation defined error code if the `graph_external`
-   property has the value `true` and `q` is not in the
-   `queue_state::recording` state.
-
 If this property is not used, then reusable event synchronization across the capture boundary
 is subject to the
 link:../experimental/sycl_ext_oneapi_graph.asciidoc#event-limitations[
 Event Limitations] section of the graph specification.
 
-'''
+=== Graph recording and replay
 
 When this property has the value `true`, the operation is recorded as a node of
 the graph:
@@ -560,10 +561,11 @@ int main() {
     syclex::parallel_for(q_eager, sycl::range{N}, [=](sycl::item<> it) { /* ... */ });
     syclex::enqueue_signal_event(q_eager, eager_event);
 
-    q_graph.ext_oneapi_graph(exec);
+    sycl::event graph_submission = q_graph.ext_oneapi_graph(exec);
 
-    // Waits for the graph's "event signal" node, not for the whole graph.
+    // The external signal can complete before the rest of the graph.
     graph_event.wait();
+    graph_submission.wait();
   }
 }
 ----
@@ -618,7 +620,7 @@ int main() {
   auto exec = graph.finalize();
 
   for (int i = 0; i < 3; ++i) {
-    q.ext_oneapi_graph(exec);
+    sycl::event graph_submission = q.ext_oneapi_graph(exec);
 
     // Each submission re-signals `start` and `end`, so their timestamps must be
     // read before the executable graph is submitted again. Waiting on `end`
@@ -632,9 +634,9 @@ int main() {
         start.get_profiling_info<sycl::info::event_profiling::command_start>();
     std::cout << "Timed region of submission " << i << ": " << elapsed
               << " (nanoseconds)\n";
-  }
 
-  q.wait();
+    graph_submission.wait();
+  }
 }
 ----
 

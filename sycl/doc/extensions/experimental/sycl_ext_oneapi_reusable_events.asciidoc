@@ -369,7 +369,7 @@ _Throws:_
 
 '''
 
-=== New property for enqueuing event operations
+=== New property for enqueuing event operations [[graph-external-property]]
 
 This extension adds the following property, which can be used with
 `enqueue_wait_event`, `enqueue_wait_events` and `enqueue_signal_event`:
@@ -401,11 +401,11 @@ indicating whether the operation may cross the graph boundary.
 When this property has the value `true`, the operation is recorded as a node of
 the graph:
 
-*  At graph submission, `enqueue_wait_event` and `enqueue_wait_events` select
-   each event's latest signal for synchronization. During replay, the node
+*  At graph submission, the node defined by `enqueue_wait_event` or `enqueue_wait_events`
+   selects each recorded event's latest signal for synchronization. During replay, it
    waits until those signals complete.
-* `enqueue_signal_event` signals an event that can be synchronized by the host or device
-   outside the graph. The event becomes `info::event_command_status::submitted`
+* `enqueue_signal_event` signals the captured event that can be synchronized by the host or device
+   outside the graph. The recorded event becomes `info::event_command_status::submitted`
    at graph submission and `info::event_command_status::complete` when the
    signal runs during replay.
 

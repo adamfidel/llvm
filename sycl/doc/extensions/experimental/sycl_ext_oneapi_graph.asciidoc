@@ -2243,6 +2243,10 @@ code `invalid`.
 - Using the event outside of the recording scope will throw synchronously with error code
 `invalid`.
 
+An exception to this rule is link:../experimental/sycl_ext_oneapi_reusable_events.asciidoc#graph-external-property[
+`graph_external`], which defines a `graph_external` property enabling reusable
+events to synchronize outside the graph.
+
 ==== Queue Limitations
 
 A host-side wait on a queue in the recording state is an error and will
@@ -2732,13 +2736,6 @@ will throw an exception if attempted:
 | `feature_not_supported`
 
 |===
-
-Reusable events passed to `enqueue_wait_event`, `enqueue_wait_events`, or
-`enqueue_signal_event` with `graph_external{true}` may synchronize with work
-outside a native-recorded graph. Their behavior is defined by
-link:../experimental/sycl_ext_oneapi_reusable_events.asciidoc#graph-recording-and-replay[
-sycl_ext_oneapi_reusable_events]. The restriction above applies to events
-returned by ordinary submissions captured in the graph.
 
 === Backend Requirements
 

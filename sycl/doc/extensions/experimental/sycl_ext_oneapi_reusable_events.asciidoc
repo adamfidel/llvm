@@ -404,15 +404,14 @@ Event Limitations] section of the graph specification.
 When this property has the value `true`, the operation is recorded as a node of
 the graph:
 
-* `enqueue_wait_event` and `enqueue_wait_events` define graph nodes that
-   block until dependent event signals reach
-   `info::event_command_status::complete`. The wait is rebound
-   to block on the latest signal of each dependent event during graph
-   submission.
+* `enqueue_wait_event` and `enqueue_wait_events` synchronize on events signaled
+   prior to graph submission. The graph node blocks until the provided event(s)
+   transition to `info::event_command_status::complete` status.
 * `enqueue_signal_event` defines a graph node that enables host or device
    synchronization outside of the graph. The provided `evt` transitions
-   to state `info::event_command_status::submitted` upon graph submission
-   and transitions to `info::event_command_status::complete` during replay.
+   to state `info::event_command_status::submitted` during graph submission
+   and transitions to `info::event_command_status::complete` after device
+   completion during graph replay.
 
 When this property has the value `false`, the operation behaves as if no
 `graph_external` property was provided.

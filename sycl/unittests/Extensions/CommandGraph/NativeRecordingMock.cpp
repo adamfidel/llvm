@@ -264,6 +264,7 @@ void registerDefaultCallbacks() {
       &mock_urEnqueueKernelLaunchWithArgsExpBefore);
 
   TRACE_UR_ENTRY_POINT(urCommandBufferCreateExp);
+  TRACE_UR_ENTRY_POINT(urEnqueueEventsWaitWithBarrierExt);
 }
 #undef TRACE_UR_ENTRY_POINT
 

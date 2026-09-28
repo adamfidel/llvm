@@ -490,6 +490,7 @@ protected:
 
 public:
   bool isIPCEnabled() const noexcept { return MIPCEnabled; }
+  bool isExternalMaterialized() const noexcept { return MExternalMaterialized; }
   bool isOpenedFromIpc() const noexcept { return MOpenedFromIpc; }
   void setIPCEnabled(bool Value) { MIPCEnabled = Value; }
 

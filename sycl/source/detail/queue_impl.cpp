@@ -604,9 +604,15 @@ void queue_impl::submit_graph_external_wait_scheduler_bypass(
   for (const EventImplPtr &Dep : ExternalDepEvents)
     ExternalWaitList.push_back(Dep->materializeGraphExternalEvent(*this));
 
-  // TODO: Replace with the external wait UR entry point once it is defined.
   std::cerr << "[TRACE] EXTERNAL_WAIT (" << ExternalWaitList.size()
             << " event(s))\n";
+
+  // TODO: Use the external event UR entry point once it is available. Until
+  // then the wait is an ordinary barrier captured into the graph, so the graph
+  // holds the dependency the event had at record time.
+  getAdapter().call<UrApiKind::urEnqueueEventsWaitWithBarrierExt>(
+      getHandleRef(), nullptr, ExternalWaitList.size(), ExternalWaitList.data(),
+      nullptr);
 }
 
 void queue_impl::submit_graph_external_signal_scheduler_bypass(
@@ -632,8 +638,12 @@ void queue_impl::submit_graph_external_signal_scheduler_bypass(
         getHandleRef(), RawDepEvents.size(), RawDepEvents.data(), nullptr);
   }
 
-  // TODO: Replace with the external signal UR entry point once it is defined.
   std::cerr << "[TRACE] EXTERNAL_SIGNAL\n";
+
+  // TODO: Use the external event UR entry point once it is available. Until
+  // then the signal is an ordinary barrier captured into the graph.
+  getAdapter().call<UrApiKind::urEnqueueEventsWaitWithBarrierExt>(
+      getHandleRef(), nullptr, 0, nullptr, &UREvent);
 
   EventForReuse->setHandleReusable(UREvent);
 }

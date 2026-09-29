@@ -101,7 +101,7 @@ public:
   queue_impl(device_impl &Device, const async_handler &AsyncHandler,
              const property_list &PropList, private_tag tag)
       : queue_impl(Device, getDefaultOrNew(Device), AsyncHandler, PropList,
-                   tag) {};
+                   tag){};
 
   /// Constructs a SYCL queue with an async_handler and property_list provided
   /// form a device and a context.
@@ -412,8 +412,9 @@ public:
   /// created here so the graph can reference them.
   ///
   /// \param ExternalEvents are the events the graph waits on.
-  void submit_external_wait_direct(sycl::span<const event> ExternalEvents) {
-    submit_external_event_direct_impl(ExternalEvents, /*EventForReuse*/ nullptr,
+  void
+  submit_graph_external_wait_direct(sycl::span<const event> ExternalEvents) {
+    submit_graph_external_direct_impl(ExternalEvents, /*EventForReuse*/ nullptr,
                                       CGType::BarrierWaitlist);
   }
 
@@ -421,8 +422,8 @@ public:
   /// recorded on this queue.
   ///
   /// \param EventForReuse is the reusable event the graph signals.
-  void submit_external_signal_direct(const EventImplPtr &EventForReuse) {
-    submit_external_event_direct_impl({}, EventForReuse, CGType::Barrier);
+  void submit_graph_external_signal_direct(const EventImplPtr &EventForReuse) {
+    submit_graph_external_direct_impl({}, EventForReuse, CGType::Barrier);
   }
 
   /// Submits an asynchronous USM device allocation to the queue, without
@@ -498,7 +499,7 @@ public:
   ///
   /// \param ExternalDepEvents are the events the graph waits on.
   /// \param DepEvents are queue-level dependencies collected by submit_direct.
-  void submit_external_wait_scheduler_bypass(
+  void submit_graph_external_wait_scheduler_bypass(
       std::vector<detail::EventImplPtr> &ExternalDepEvents,
       std::vector<detail::EventImplPtr> &DepEvents);
 
@@ -507,7 +508,7 @@ public:
   ///
   /// \param DepEvents are queue-level dependencies collected by submit_direct.
   /// \param EventForReuse is the reusable event the graph signals.
-  void submit_external_signal_scheduler_bypass(
+  void submit_graph_external_signal_scheduler_bypass(
       std::vector<detail::EventImplPtr> &DepEvents,
       const EventImplPtr &EventForReuse);
 
@@ -1117,9 +1118,10 @@ protected:
   /// \param EventForReuse is the event an external signal signals.
   /// \param Type is CGType::BarrierWaitlist for a wait, CGType::Barrier for a
   ///        signal.
-  void submit_external_event_direct_impl(
-      sycl::span<const event> ExternalDepEvents,
-      const EventImplPtr &EventForReuse, detail::CGType Type);
+  void
+  submit_graph_external_direct_impl(sycl::span<const event> ExternalDepEvents,
+                                    const EventImplPtr &EventForReuse,
+                                    detail::CGType Type);
 
   /// Marks an event as submitted through a scheduler-bypass path on this
   /// queue.

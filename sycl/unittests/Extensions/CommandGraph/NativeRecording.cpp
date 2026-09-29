@@ -348,8 +348,8 @@ TEST_F(NativeRecordingTest, ExternalWaitUrTrace) {
       getSyclObjImpl(UnsignaledEvent2)->getHandle();
   EXPECT_NE(UnsignaledHandle1, nullptr);
   EXPECT_NE(UnsignaledHandle2, nullptr);
-  EXPECT_TRUE(getSyclObjImpl(UnsignaledEvent1)->isExternalMaterialized());
-  EXPECT_TRUE(getSyclObjImpl(UnsignaledEvent2)->isExternalMaterialized());
+  EXPECT_TRUE(getSyclObjImpl(UnsignaledEvent1)->isGraphExternalMaterialized());
+  EXPECT_TRUE(getSyclObjImpl(UnsignaledEvent2)->isGraphExternalMaterialized());
   EXPECT_EQ(getSyclObjImpl(SignaledEvent1)->getHandle(), SignaledHandle1);
   EXPECT_EQ(getSyclObjImpl(SignaledEvent2)->getHandle(), SignaledHandle2);
 

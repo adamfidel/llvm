@@ -1123,13 +1123,6 @@ protected:
                                     const EventImplPtr &EventForReuse,
                                     detail::CGType Type);
 
-  /// Marks an event as submitted through a scheduler-bypass path on this
-  /// queue.
-  ///
-  /// \param Event is the event to initialize.
-  /// \param IsReusable is true for an event passed in by the user for reuse.
-  void initBypassSubmissionEvent(event_impl &Event, bool IsReusable);
-
   /// Helper function for submitting a memory operation with a handler.
   /// \param DepEvents is a vector of dependencies of the operation.
   /// \param HandlerFunc is a function that submits the operation with a

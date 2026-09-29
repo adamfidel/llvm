@@ -402,10 +402,27 @@ public:
   void submit_barrier_direct_without_event(
       sycl::span<const event> DepEvents, detail::CGType BarrierType,
       const detail::code_location &CodeLoc,
-      const EventImplPtr &EventForReuse = nullptr,
-      bool IsGraphExternal = false) {
+      const EventImplPtr &EventForReuse = nullptr) {
     submit_barrier_direct_impl(DepEvents, BarrierType, CodeLoc, false,
-                               EventForReuse, IsGraphExternal);
+                               EventForReuse);
+  }
+
+  /// Records a wait on events external to the graph being natively recorded
+  /// on this queue. Events which have never been signaled get their UR handle
+  /// created here so the graph can reference them.
+  ///
+  /// \param ExternalEvents are the events the graph waits on.
+  void submit_external_wait_direct(sycl::span<const event> ExternalEvents) {
+    submit_external_event_direct_impl(ExternalEvents, /*EventForReuse*/ nullptr,
+                                      CGType::BarrierWaitlist);
+  }
+
+  /// Records a signal of an event external to the graph being natively
+  /// recorded on this queue.
+  ///
+  /// \param EventForReuse is the reusable event the graph signals.
+  void submit_external_signal_direct(const EventImplPtr &EventForReuse) {
+    submit_external_event_direct_impl({}, EventForReuse, CGType::Barrier);
   }
 
   /// Submits an asynchronous USM device allocation to the queue, without
@@ -474,8 +491,25 @@ public:
   EventImplPtr submit_barrier_scheduler_bypass(
       std::vector<detail::EventImplPtr> &BarrierDepEvents,
       std::vector<detail::EventImplPtr> &DepEvents, detail::CGType BarrierType,
-      bool EventNeeded, const EventImplPtr &EventForReuse,
-      bool IsGraphExternal);
+      bool EventNeeded, const EventImplPtr &EventForReuse);
+
+  /// Records an external wait into the natively recorded graph, bypassing the
+  /// scheduler. Must be called with the queue lock held from submit_direct.
+  ///
+  /// \param ExternalDepEvents are the events the graph waits on.
+  /// \param DepEvents are queue-level dependencies collected by submit_direct.
+  void submit_external_wait_scheduler_bypass(
+      std::vector<detail::EventImplPtr> &ExternalDepEvents,
+      std::vector<detail::EventImplPtr> &DepEvents);
+
+  /// Records an external signal into the natively recorded graph, bypassing
+  /// the scheduler. Must be called with the queue lock held from submit_direct.
+  ///
+  /// \param DepEvents are queue-level dependencies collected by submit_direct.
+  /// \param EventForReuse is the reusable event the graph signals.
+  void submit_external_signal_scheduler_bypass(
+      std::vector<detail::EventImplPtr> &DepEvents,
+      const EventImplPtr &EventForReuse);
 
   /// Completes the submission of an asynchronous allocation using the scheduler
   /// bypass fast path. The allocation itself has already been enqueued to the
@@ -1069,15 +1103,30 @@ protected:
   ///
   /// \param DepEvents is a vector of dependencies of the operation.
   /// \param CodeLoc is the code location of the submit call
-  /// \param IsGraphExternal signals that the barrier represents an external
-  ///        signal or wait on a graph being recorded on the queue.
   ///
   /// \return a SYCL event representing submitted command group or nullptr.
   EventImplPtr submit_barrier_direct_impl(
       sycl::span<const event> DepEvents, detail::CGType BarrierType,
       const detail::code_location &CodeLoc, bool CallerNeedsEvent = true,
-      const EventImplPtr &EventForReuse = nullptr,
-      bool IsGraphExternal = false);
+      const EventImplPtr &EventForReuse = nullptr);
+
+  /// Performs an external wait or signal submission to the queue. Exactly one
+  /// of ExternalDepEvents and EventForReuse is set.
+  ///
+  /// \param ExternalDepEvents are the events an external wait depends on.
+  /// \param EventForReuse is the event an external signal signals.
+  /// \param Type is CGType::BarrierWaitlist for a wait, CGType::Barrier for a
+  ///        signal.
+  void submit_external_event_direct_impl(
+      sycl::span<const event> ExternalDepEvents,
+      const EventImplPtr &EventForReuse, detail::CGType Type);
+
+  /// Marks an event as submitted through a scheduler-bypass path on this
+  /// queue.
+  ///
+  /// \param Event is the event to initialize.
+  /// \param IsReusable is true for an event passed in by the user for reuse.
+  void initBypassSubmissionEvent(event_impl &Event, bool IsReusable);
 
   /// Helper function for submitting a memory operation with a handler.
   /// \param DepEvents is a vector of dependencies of the operation.

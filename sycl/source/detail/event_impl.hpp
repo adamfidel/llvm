@@ -131,7 +131,7 @@ public:
   ///
   /// \param Queue provides the device the UR event is created on
   /// \return the backend UR handle of the event
-  ur_event_handle_t materializeExternalEvent(queue_impl &Queue);
+  ur_event_handle_t materializeGraphExternalEvent(queue_impl &Queue);
 
   /// Returns an event UR handle and applies additional logic
   /// related to reusable events.
@@ -425,7 +425,7 @@ public:
     // The same holds for an event whose handle was materialized for an external
     // graph wait before its first signal.
     return MEvent && MQueue.expired() && !MIsEnqueued && !MCommand &&
-           !MIPCEnabled && !MOpenedFromIpc && !MExternalMaterialized;
+           !MIPCEnabled && !MOpenedFromIpc && !MGraphExternalMaterialized;
   }
 
   // Initializes the host profiling info for the event.
@@ -485,12 +485,14 @@ protected:
   void *MIPCHandleData = nullptr;
   size_t MIPCHandleDataSize = 0;
 
-  /// True once materializeExternalEvent() has created the UR handle.
-  bool MExternalMaterialized = false;
+  /// True once materializeGraphExternalEvent() has created the UR handle.
+  bool MGraphExternalMaterialized = false;
 
 public:
   bool isIPCEnabled() const noexcept { return MIPCEnabled; }
-  bool isExternalMaterialized() const noexcept { return MExternalMaterialized; }
+  bool isGraphExternalMaterialized() const noexcept {
+    return MGraphExternalMaterialized;
+  }
   bool isOpenedFromIpc() const noexcept { return MOpenedFromIpc; }
   void setIPCEnabled(bool Value) { MIPCEnabled = Value; }
 

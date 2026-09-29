@@ -484,8 +484,7 @@ EventImplPtr queue_impl::submit_kernel_scheduler_bypass(
   return ResultEvent;
 }
 
-void queue_impl::initBypassSubmissionEvent(event_impl &Event,
-                                           bool IsReusable) {
+void queue_impl::initBypassSubmissionEvent(event_impl &Event, bool IsReusable) {
   if (IsReusable) {
     Event.setQueue(*this);
     Event.markAsProfilingTagEvent();
@@ -586,7 +585,7 @@ EventImplPtr queue_impl::submit_barrier_scheduler_bypass(
   return (DiscardEvent || EventForReuse) ? nullptr : ResEvent;
 }
 
-void queue_impl::submit_external_wait_scheduler_bypass(
+void queue_impl::submit_graph_external_wait_scheduler_bypass(
     std::vector<detail::EventImplPtr> &ExternalDepEvents,
     std::vector<detail::EventImplPtr> &DepEvents) {
   if (!DepEvents.empty()) {
@@ -606,19 +605,19 @@ void queue_impl::submit_external_wait_scheduler_bypass(
   std::vector<ur_event_handle_t> ExternalWaitList;
   ExternalWaitList.reserve(ExternalDepEvents.size());
   for (const EventImplPtr &Dep : ExternalDepEvents)
-    ExternalWaitList.push_back(Dep->materializeExternalEvent(*this));
+    ExternalWaitList.push_back(Dep->materializeGraphExternalEvent(*this));
 
   // TODO: Replace with the external wait UR entry point once it is defined.
   std::cerr << "[TRACE] EXTERNAL_WAIT (" << ExternalWaitList.size()
             << " event(s))\n";
 }
 
-void queue_impl::submit_external_signal_scheduler_bypass(
+void queue_impl::submit_graph_external_signal_scheduler_bypass(
     std::vector<detail::EventImplPtr> &DepEvents,
     const EventImplPtr &EventForReuse) {
   // Create the handle with the external flags before getHandleReusable would
   // otherwise create a plain one.
-  EventForReuse->materializeExternalEvent(*this);
+  EventForReuse->materializeGraphExternalEvent(*this);
   ur_event_handle_t UREvent = EventForReuse->getHandleReusable(*this);
 
   std::vector<ur_event_handle_t> RawDepEvents;
@@ -638,7 +637,7 @@ void queue_impl::submit_external_signal_scheduler_bypass(
   EventForReuse->setHandleReusable(UREvent);
 }
 
-void queue_impl::submit_external_event_direct_impl(
+void queue_impl::submit_graph_external_direct_impl(
     sycl::span<const event> ExternalDepEvents,
     const EventImplPtr &EventForReuse, detail::CGType Type) {
   assert((Type == CGType::Barrier) == (EventForReuse != nullptr) &&
@@ -681,10 +680,11 @@ void queue_impl::submit_external_event_direct_impl(
     }
 
     if (Type == CGType::Barrier)
-      submit_external_signal_scheduler_bypass(CGData.MEvents, EventForReuse);
+      submit_graph_external_signal_scheduler_bypass(CGData.MEvents,
+                                                    EventForReuse);
     else
-      submit_external_wait_scheduler_bypass(ExternalDepEventImpls,
-                                            CGData.MEvents);
+      submit_graph_external_wait_scheduler_bypass(ExternalDepEventImpls,
+                                                  CGData.MEvents);
 
     return {nullptr, /*SchedulerBypass*/ true};
   };

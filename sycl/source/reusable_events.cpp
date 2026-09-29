@@ -86,7 +86,8 @@ __SYCL_EXPORT void enqueue_wait_event(sycl::queue q, const event &evt,
   CheckEventAndThrow(EventImpl, QueueImpl.getContextImpl());
 
   if (External) {
-    QueueImpl.submit_external_wait_direct(sycl::span<const event>(&evt, 1));
+    QueueImpl.submit_graph_external_wait_direct(
+        sycl::span<const event>(&evt, 1));
     return;
   }
 
@@ -108,7 +109,7 @@ __SYCL_EXPORT void enqueue_wait_events(sycl::queue q,
   }
 
   if (External) {
-    QueueImpl.submit_external_wait_direct(evts);
+    QueueImpl.submit_graph_external_wait_direct(evts);
     return;
   }
 
@@ -146,7 +147,8 @@ __SYCL_EXPORT void enqueue_signal_event(sycl::queue q, event &evt,
   }
 
   if (External) {
-    QueueImpl.submit_external_signal_direct(sycl::detail::getSyclObjImpl(evt));
+    QueueImpl.submit_graph_external_signal_direct(
+        sycl::detail::getSyclObjImpl(evt));
     return;
   }
 

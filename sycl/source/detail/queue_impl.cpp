@@ -484,11 +484,24 @@ EventImplPtr queue_impl::submit_kernel_scheduler_bypass(
   return ResultEvent;
 }
 
+void queue_impl::initBypassSubmissionEvent(event_impl &Event,
+                                           bool IsReusable) {
+  if (IsReusable) {
+    Event.setQueue(*this);
+    Event.markAsProfilingTagEvent();
+  }
+  Event.setWorkerQueue(weak_from_this());
+  Event.setPotentiallyNativeRecorded(
+      getContextImpl().isNativeRecordingActive());
+  Event.setSubmissionTime();
+  Event.setEnqueued();
+  Event.setStateIncomplete();
+}
+
 EventImplPtr queue_impl::submit_barrier_scheduler_bypass(
     std::vector<detail::EventImplPtr> &BarrierDepEvents,
     std::vector<detail::EventImplPtr> &DepEvents, detail::CGType BarrierType,
-    bool EventNeeded, const EventImplPtr &EventForReuse,
-    bool IsGraphExternal) {
+    bool EventNeeded, const EventImplPtr &EventForReuse) {
 
   // EventForReuse can only be set for BarrierType equal to CGType::Barrier
   // (enqueue_signal_event function)
@@ -515,26 +528,14 @@ EventImplPtr queue_impl::submit_barrier_scheduler_bypass(
   if (!DiscardEvent || EventForReuse) {
     ResEvent = EventForReuse ? EventForReuse
                              : detail::event_impl::create_device_event(*this);
-    if (EventForReuse) {
-      ResEvent->setQueue(*this);
-    }
-    ResEvent->setWorkerQueue(weak_from_this());
-    ResEvent->setPotentiallyNativeRecorded(
-        getContextImpl().isNativeRecordingActive());
-    if (EventForReuse)
-      ResEvent->markAsProfilingTagEvent();
-    ResEvent->setSubmissionTime();
-    ResEvent->setEnqueued();
-    ResEvent->setStateIncomplete();
+    initBypassSubmissionEvent(*ResEvent, EventForReuse != nullptr);
   }
 
   // We can skip the barrier UR call only if both the barrier wait list
   // and the list of barrier command dependencies are empty (after filtering
   // the UR events).
-  // An external wait is never a no-op: the graph it is recorded into has to
-  // reference the event even when the event has no dependencies yet.
-  if (BarrierType == CGType::BarrierWaitlist && !IsGraphExternal &&
-      RawBarrierDepEvents.empty() && RawDepEvents.empty()) {
+  if (BarrierType == CGType::BarrierWaitlist && RawBarrierDepEvents.empty() &&
+      RawDepEvents.empty()) {
     if (!DiscardEvent) {
       ResEvent->setComplete();
     }
@@ -547,29 +548,9 @@ EventImplPtr queue_impl::submit_barrier_scheduler_bypass(
           getHandleRef(), RawDepEvents.size(), &RawDepEvents[0], nullptr);
     }
 
-    if (IsGraphExternal) {
-      // TODO: Replace with the external signal UR entry point once it is
-      // defined.
-      std::cerr << "[TRACE] EXTERNAL_SIGNAL\n";
-    } else {
-      getAdapter().call<UrApiKind::urEnqueueEventsWaitWithBarrierExt>(
-          getHandleRef(), nullptr, 0, nullptr,
-          (DiscardEvent && !EventForReuse) ? nullptr : &UREvent);
-    }
-  } else if (IsGraphExternal) {
-    // The handles are collected here instead of through
-    // Command::getUrEvents so that its in-order redundancy filtering cannot
-    // drop an event which is external to the graph.
-    std::vector<ur_event_handle_t> ExternalWaitList;
-    ExternalWaitList.reserve(BarrierDepEvents.size());
-    for (const EventImplPtr &Dep : BarrierDepEvents) {
-      if (ur_event_handle_t Handle = Dep->getHandle())
-        ExternalWaitList.push_back(Handle);
-    }
-
-    // TODO: Replace with the external wait UR entry point once it is defined.
-    std::cerr << "[TRACE] EXTERNAL_WAIT (" << ExternalWaitList.size()
-              << " event(s))\n";
+    getAdapter().call<UrApiKind::urEnqueueEventsWaitWithBarrierExt>(
+        getHandleRef(), nullptr, 0, nullptr,
+        (DiscardEvent && !EventForReuse) ? nullptr : &UREvent);
   } else {
 
     RawDepEvents.insert(RawDepEvents.end(), RawBarrierDepEvents.begin(),
@@ -605,10 +586,117 @@ EventImplPtr queue_impl::submit_barrier_scheduler_bypass(
   return (DiscardEvent || EventForReuse) ? nullptr : ResEvent;
 }
 
+void queue_impl::submit_external_wait_scheduler_bypass(
+    std::vector<detail::EventImplPtr> &ExternalDepEvents,
+    std::vector<detail::EventImplPtr> &DepEvents) {
+  if (!DepEvents.empty()) {
+    std::vector<ur_event_handle_t> RawDepEvents =
+        detail::Command::getUrEvents(DepEvents, this, false);
+    if (!RawDepEvents.empty()) {
+      getAdapter().call<UrApiKind::urEnqueueEventsWait>(
+          getHandleRef(), RawDepEvents.size(), RawDepEvents.data(), nullptr);
+    }
+  }
+
+  // The handles are collected directly instead of through
+  // Command::getUrEvents so that its in-order redundancy filtering cannot drop
+  // an event which is external to the graph. An event which was never signaled
+  // gets its handle created here, under the queue lock, so the graph has
+  // something to reference until the later signal.
+  std::vector<ur_event_handle_t> ExternalWaitList;
+  ExternalWaitList.reserve(ExternalDepEvents.size());
+  for (const EventImplPtr &Dep : ExternalDepEvents)
+    ExternalWaitList.push_back(Dep->materializeExternalEvent(*this));
+
+  // TODO: Replace with the external wait UR entry point once it is defined.
+  std::cerr << "[TRACE] EXTERNAL_WAIT (" << ExternalWaitList.size()
+            << " event(s))\n";
+}
+
+void queue_impl::submit_external_signal_scheduler_bypass(
+    std::vector<detail::EventImplPtr> &DepEvents,
+    const EventImplPtr &EventForReuse) {
+  // Create the handle with the external flags before getHandleReusable would
+  // otherwise create a plain one.
+  EventForReuse->materializeExternalEvent(*this);
+  ur_event_handle_t UREvent = EventForReuse->getHandleReusable(*this);
+
+  std::vector<ur_event_handle_t> RawDepEvents;
+  if (!DepEvents.empty())
+    RawDepEvents = detail::Command::getUrEvents(DepEvents, this, false);
+
+  initBypassSubmissionEvent(*EventForReuse, /*IsReusable*/ true);
+
+  if (!RawDepEvents.empty()) {
+    getAdapter().call<UrApiKind::urEnqueueEventsWait>(
+        getHandleRef(), RawDepEvents.size(), RawDepEvents.data(), nullptr);
+  }
+
+  // TODO: Replace with the external signal UR entry point once it is defined.
+  std::cerr << "[TRACE] EXTERNAL_SIGNAL\n";
+
+  EventForReuse->setHandleReusable(UREvent);
+}
+
+void queue_impl::submit_external_event_direct_impl(
+    sycl::span<const event> ExternalDepEvents,
+    const EventImplPtr &EventForReuse, detail::CGType Type) {
+  assert((Type == CGType::Barrier) == (EventForReuse != nullptr) &&
+         "An external signal reuses an event, an external wait does not");
+  assert((Type != CGType::Barrier || ExternalDepEvents.empty()) &&
+         "Only an external wait has external dependencies");
+
+  // The graph keeps referencing the event's UR handle across signals, which is
+  // only valid when the backend reuses the handle instead of replacing it.
+  if (!getContextImpl().supportsReusableEvents()) {
+    throw sycl::exception(sycl::make_error_code(errc::feature_not_supported),
+                          "graph_external events require reusable event "
+                          "support in the queue's context.");
+  }
+
+  auto SubmitExternalFunc = [&](detail::CG::StorageInitHelper &&CGData)
+      -> std::pair<EventImplPtr, bool> {
+    if (hasCommandGraph()) {
+      throw sycl::exception(sycl::make_error_code(errc::invalid),
+                            "graph_external events are not supported on a "
+                            "queue recording a non-native graph.");
+    }
+
+    std::vector<detail::EventImplPtr> ExternalDepEventImpls;
+    ExternalDepEventImpls.reserve(ExternalDepEvents.size());
+    for (const event &Event : ExternalDepEvents)
+      ExternalDepEventImpls.emplace_back(detail::getSyclObjImpl(Event));
+
+    // Same limitation as the reusable event barriers: the external wait or
+    // signal is submitted directly to the backend, so every dependency must
+    // already be enqueued there.
+    if (!detail::Scheduler::areEventsSafeForSchedulerBypass(
+            ExternalDepEventImpls, getContextImpl()) ||
+        !detail::Scheduler::areEventsSafeForSchedulerBypass(CGData.MEvents,
+                                                            getContextImpl())) {
+      throw sycl::exception(
+          sycl::make_error_code(errc::invalid),
+          "An event cannot be enqueued for signaling or waiting "
+          "behind a command which is not enqueued in the backend.");
+    }
+
+    if (Type == CGType::Barrier)
+      submit_external_signal_scheduler_bypass(CGData.MEvents, EventForReuse);
+    else
+      submit_external_wait_scheduler_bypass(ExternalDepEventImpls,
+                                            CGData.MEvents);
+
+    return {nullptr, /*SchedulerBypass*/ true};
+  };
+
+  submit_direct(/*CallerNeedsEvent*/ false, {}, SubmitExternalFunc, Type,
+                /*InsertBarrierForInOrderCommand*/ false);
+}
+
 EventImplPtr queue_impl::submit_barrier_direct_impl(
     sycl::span<const event> DepEvents, detail::CGType BarrierType,
     const detail::code_location &CodeLoc, bool CallerNeedsEvent,
-    const EventImplPtr &EventForReuse, bool IsGraphExternal) {
+    const EventImplPtr &EventForReuse) {
   auto SubmitBarrierFunc = [&](detail::CG::StorageInitHelper &&CGData)
       -> std::pair<EventImplPtr, bool> {
     std::vector<detail::EventImplPtr> DepEventImpls;
@@ -638,9 +726,9 @@ EventImplPtr queue_impl::submit_barrier_direct_impl(
         CGData.MEvents, getContextImpl());
 
     if (SchedulerBypass) {
-      return {submit_barrier_scheduler_bypass(
-                  DepEventImpls, CGData.MEvents, BarrierType, CallerNeedsEvent,
-                  EventForReuse, IsGraphExternal),
+      return {submit_barrier_scheduler_bypass(DepEventImpls, CGData.MEvents,
+                                              BarrierType, CallerNeedsEvent,
+                                              EventForReuse),
               /*SchedulerBypass*/ true};
     }
 

@@ -85,16 +85,14 @@ __SYCL_EXPORT void enqueue_wait_event(sycl::queue q, const event &evt,
 
   CheckEventAndThrow(EventImpl, QueueImpl.getContextImpl());
 
-  // An event external to a graph may be waited on before it has ever been
-  // signaled, so the backend UR event has to exist up front for the recorded
-  // wait to reference. The event stays unsignaled until a later
-  // enqueue_signal_event, which reuses the handle created here.
-  if (External)
-    EventImpl.materializeExternalEvent(QueueImpl);
+  if (External) {
+    QueueImpl.submit_external_wait_direct(sycl::span<const event>(&evt, 1));
+    return;
+  }
 
   QueueImpl.submit_barrier_direct_without_event(
       sycl::span<const event>(&evt, 1), detail::CGType::BarrierWaitlist,
-      detail::code_location::current(), /*EventForReuse*/ nullptr, External);
+      detail::code_location::current());
 }
 
 __SYCL_EXPORT void enqueue_wait_events(sycl::queue q,
@@ -105,16 +103,17 @@ __SYCL_EXPORT void enqueue_wait_events(sycl::queue q,
   detail::queue_impl &QueueImpl = *sycl::detail::getSyclObjImpl(q);
 
   for (const sycl::event &evt : evts) {
-    detail::event_impl &EventImpl = *sycl::detail::getSyclObjImpl(evt);
-    CheckEventAndThrow(EventImpl, QueueImpl.getContextImpl());
+    CheckEventAndThrow(*sycl::detail::getSyclObjImpl(evt),
+                       QueueImpl.getContextImpl());
+  }
 
-    if (External)
-      EventImpl.materializeExternalEvent(QueueImpl);
+  if (External) {
+    QueueImpl.submit_external_wait_direct(evts);
+    return;
   }
 
   QueueImpl.submit_barrier_direct_without_event(
-      evts, detail::CGType::BarrierWaitlist, detail::code_location::current(),
-      /*EventForReuse*/ nullptr, External);
+      evts, detail::CGType::BarrierWaitlist, detail::code_location::current());
 }
 
 __SYCL_EXPORT void enqueue_signal_event(sycl::queue q, event &evt,
@@ -146,9 +145,14 @@ __SYCL_EXPORT void enqueue_signal_event(sycl::queue q, event &evt,
         "profiling enabled.");
   }
 
+  if (External) {
+    QueueImpl.submit_external_signal_direct(sycl::detail::getSyclObjImpl(evt));
+    return;
+  }
+
   QueueImpl.submit_barrier_direct_without_event(
       {}, detail::CGType::Barrier, detail::code_location::current(),
-      sycl::detail::getSyclObjImpl(evt), External);
+      sycl::detail::getSyclObjImpl(evt));
 }
 
 } // namespace detail

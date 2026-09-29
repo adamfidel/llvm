@@ -202,7 +202,9 @@ void event_impl::setQueue(queue_impl &Queue) {
   MIsProfilingEnabled = MIsProfilingEnabled || Queue.MIsProfilingEnabled;
 }
 
-ur_event_handle_t event_impl::createDeviceUrEvent(device_impl &Device) {
+ur_event_handle_t
+event_impl::createDeviceUrEvent(device_impl &Device,
+                                [[maybe_unused]] bool UseDetachedEvent) {
   assert(MContext && "createDeviceUrEvent requires a bound context");
 
   ur_event_handle_t EventHandle = nullptr;
@@ -263,7 +265,8 @@ ur_event_handle_t event_impl::materializeExternalEvent(queue_impl &Queue) {
   initContextIfNeeded();
 
   if (getHandle() == nullptr)
-    setHandle(createDeviceUrEvent(Queue.getDeviceImpl()));
+    setHandle(createDeviceUrEvent(Queue.getDeviceImpl(),
+                                  /*UseDetachedEvent*/ true));
 
   // A handle without a queue is otherwise indistinguishable from an interop
   // event, which enqueue_signal_event rejects.

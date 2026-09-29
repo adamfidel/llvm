@@ -121,9 +121,9 @@ public:
   /// exists.
   void materializeIPCEvent();
 
-  /// Lazily creates the backend UR event so that it can be used as an external
-  /// signal or wait of a graph. For a wait this happens before the event has
-  /// ever been signaled. No-op if the handle already exists.
+  /// Lazily creates the backend UR event so that a graph can wait on it as an
+  /// external dependency before it has ever been signaled. No-op if the handle
+  /// already exists.
   ///
   /// Unlike toDeviceEvent(), this leaves the event default constructed, so a
   /// later enqueue_signal_event still goes through getHandleReusable() and
@@ -548,8 +548,8 @@ protected:
 
   // Creates a backend UR event on \p Device with this event's profiling/IPC
   // flags. The context must already be bound. UseDetachedEvent requests an
-  // event which is not tied to the queue's command list, as needed for external
-  // graph signals and waits; it is not forwarded to UR yet.
+  // event which is not tied to the queue's command list, as needed for an
+  // external graph wait; it is not forwarded to UR yet.
   ur_event_handle_t createDeviceUrEvent(device_impl &Device,
                                         bool UseDetachedEvent = false);
   // Event class represents 3 different kinds of operations:

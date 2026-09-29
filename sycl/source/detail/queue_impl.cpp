@@ -484,19 +484,6 @@ EventImplPtr queue_impl::submit_kernel_scheduler_bypass(
   return ResultEvent;
 }
 
-void queue_impl::initBypassSubmissionEvent(event_impl &Event, bool IsReusable) {
-  if (IsReusable) {
-    Event.setQueue(*this);
-    Event.markAsProfilingTagEvent();
-  }
-  Event.setWorkerQueue(weak_from_this());
-  Event.setPotentiallyNativeRecorded(
-      getContextImpl().isNativeRecordingActive());
-  Event.setSubmissionTime();
-  Event.setEnqueued();
-  Event.setStateIncomplete();
-}
-
 EventImplPtr queue_impl::submit_barrier_scheduler_bypass(
     std::vector<detail::EventImplPtr> &BarrierDepEvents,
     std::vector<detail::EventImplPtr> &DepEvents, detail::CGType BarrierType,
@@ -527,7 +514,17 @@ EventImplPtr queue_impl::submit_barrier_scheduler_bypass(
   if (!DiscardEvent || EventForReuse) {
     ResEvent = EventForReuse ? EventForReuse
                              : detail::event_impl::create_device_event(*this);
-    initBypassSubmissionEvent(*ResEvent, EventForReuse != nullptr);
+    if (EventForReuse) {
+      ResEvent->setQueue(*this);
+    }
+    ResEvent->setWorkerQueue(weak_from_this());
+    ResEvent->setPotentiallyNativeRecorded(
+        getContextImpl().isNativeRecordingActive());
+    if (EventForReuse)
+      ResEvent->markAsProfilingTagEvent();
+    ResEvent->setSubmissionTime();
+    ResEvent->setEnqueued();
+    ResEvent->setStateIncomplete();
   }
 
   // We can skip the barrier UR call only if both the barrier wait list
@@ -615,16 +612,20 @@ void queue_impl::submit_graph_external_wait_scheduler_bypass(
 void queue_impl::submit_graph_external_signal_scheduler_bypass(
     std::vector<detail::EventImplPtr> &DepEvents,
     const EventImplPtr &EventForReuse) {
-  // Create the handle with the external flags before getHandleReusable would
-  // otherwise create a plain one.
-  EventForReuse->materializeGraphExternalEvent(*this);
   ur_event_handle_t UREvent = EventForReuse->getHandleReusable(*this);
 
   std::vector<ur_event_handle_t> RawDepEvents;
   if (!DepEvents.empty())
     RawDepEvents = detail::Command::getUrEvents(DepEvents, this, false);
 
-  initBypassSubmissionEvent(*EventForReuse, /*IsReusable*/ true);
+  EventForReuse->setQueue(*this);
+  EventForReuse->setWorkerQueue(weak_from_this());
+  EventForReuse->setPotentiallyNativeRecorded(
+      getContextImpl().isNativeRecordingActive());
+  EventForReuse->markAsProfilingTagEvent();
+  EventForReuse->setSubmissionTime();
+  EventForReuse->setEnqueued();
+  EventForReuse->setStateIncomplete();
 
   if (!RawDepEvents.empty()) {
     getAdapter().call<UrApiKind::urEnqueueEventsWait>(

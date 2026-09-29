@@ -122,8 +122,8 @@ public:
   void materializeIPCEvent();
 
   /// Lazily creates the backend UR event so that it can be used as an external
-  /// dependency of a graph before it has ever been signaled. No-op if it
-  /// already exists.
+  /// signal or wait of a graph. For a wait this happens before the event has
+  /// ever been signaled. No-op if the handle already exists.
   ///
   /// Unlike toDeviceEvent(), this leaves the event default constructed, so a
   /// later enqueue_signal_event still goes through getHandleReusable() and
@@ -422,8 +422,8 @@ public:
     // handle was materialized by get(), or an event imported via
     // ipc::event::open) also own a UR handle without a queue/command, but they
     // are not interop events and must remain usable with enqueue_signal_event.
-    // The same holds for an event whose handle was materialized to be waited on
-    // as an external graph dependency before its first signal.
+    // The same holds for an event whose handle was materialized for an external
+    // graph wait before its first signal.
     return MEvent && MQueue.expired() && !MIsEnqueued && !MCommand &&
            !MIPCEnabled && !MOpenedFromIpc && !MExternalMaterialized;
   }
@@ -545,8 +545,11 @@ protected:
   void initContextIfNeeded();
 
   // Creates a backend UR event on \p Device with this event's profiling/IPC
-  // flags. The context must already be bound.
-  ur_event_handle_t createDeviceUrEvent(device_impl &Device);
+  // flags. The context must already be bound. UseDetachedEvent requests an
+  // event which is not tied to the queue's command list, as needed for external
+  // graph signals and waits; it is not forwarded to UR yet.
+  ur_event_handle_t createDeviceUrEvent(device_impl &Device,
+                                        bool UseDetachedEvent = false);
   // Event class represents 3 different kinds of operations:
   // | type  | has UR event | MContext | MIsHostTask | MIsDefaultConstructed |
   // | dev   | true         | !nullptr | false       | false                 |

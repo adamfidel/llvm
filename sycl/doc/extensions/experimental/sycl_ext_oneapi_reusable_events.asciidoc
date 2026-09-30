@@ -390,9 +390,9 @@ event node of the graph. The nodes display the following behavior during graph r
 
 * For `enqueue_wait_event` and `enqueue_wait_events`:
 
-** Submitting the executable graph captures the command then
-   associated with each provided event.
-** During executable graph replay, the wait node blocks until those commands
+** Submitting the executable graph (e.g., via `q.ext_oneapi_graph()) captures the command
+   that is associated with each event at the time of submission.
+** During graph execution, the wait node blocks until those commands
    complete.
 
 * For `enqueue_signal_event`:
@@ -400,12 +400,14 @@ event node of the graph. The nodes display the following behavior during graph r
 ** Submitting the executable graph disassociates the event from its previous
    command and sets its status to `info::event_command_status::submitted`.
 ** The event's status becomes `info::event_command_status::complete` when the
-   signal node's preceding commands complete.
+   graph node associated with the event is complete.
 ** Events signaled with this property may be used for host or device
    synchronization and queried with
    `event::get_info<info::event::command_execution_status>()`. They may also be
    queried with `event::get_profiling_info()` if profiling is enabled on the
    event or queue.
+
+
 
 When this property has the value `false`, the operation behaves as if no
 `graph_external` property was provided.
@@ -413,6 +415,10 @@ When this property has the value `false`, the operation behaves as if no
 It is undefined behavior to destroy a reusable event used as a graph external signal
 or wait prior to destroying its associated modifiable and executable `command_graph`
 objects.
+
+TODO: 
+- enqueue_signal_event with graph_external + depends_on for that event = external sync for an intra-graph edge 
+- look up other vendors 
 
 === Interaction with sycl_ext_oneapi_graph [[reusable-events-graph-interaction]]
 
@@ -427,8 +433,8 @@ Event Limitations]. These recorded operations have no observable effects
 outside the graph during replay.
 
 The same reusable event may be used by operations both inside and outside a
-`command_graph`. A recorded signal or wait without `graph_external{true}` can
-synchronize only with operations in the same graph.
+`command_graph`. A recorded signal or wait without `graph_external{true}` can 
+only be used as a depedency for operations in the same graph.
 
 === Interaction with other event APIs
 

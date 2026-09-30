@@ -29,6 +29,8 @@ struct TraceEntry {
   const void *Handle;
   // The call's UR event wait list (relevant for enqueue ops)
   std::optional<std::vector<ur_event_handle_t>> WaitList;
+  // The event handle supplied as the output of a barrier call, if any.
+  std::optional<ur_event_handle_t> OutputEvent;
 };
 
 // Unique per-graph state
@@ -58,7 +60,8 @@ MockState &state();
 // Records a call to EntryPoint, optionally against the object it was about.
 void trace(
     std::string EntryPoint, const void *Handle = nullptr,
-    std::optional<std::vector<ur_event_handle_t>> WaitList = std::nullopt);
+    std::optional<std::vector<ur_event_handle_t>> WaitList = std::nullopt,
+    std::optional<ur_event_handle_t> OutputEvent = std::nullopt);
 
 // Fails EntryPoint before its mock implementation runs while still tracing the
 // call

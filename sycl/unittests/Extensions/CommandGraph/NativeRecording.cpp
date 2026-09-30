@@ -299,80 +299,92 @@ TEST_F(NativeRecordingTest, ExternalWaitDepReachesUr) {
             (UrWaitLists{{}, {getSyclObjImpl(BeforeRecording)->getHandle()}}));
 }
 
-// Recorded graph_external waits and signals must lower to the external event
-// UR entry points instead of ordinary barriers captured into the graph.
-// TODO: The external wait / signal UR entry points are not defined yet. Once
-// they are, replace the placeholder names, trace them in the mock, and enable
-// the commented out checks in the two tests below.
-TEST_F(NativeRecordingTest, ExternalWaitUrTrace) {
-  constexpr std::string_view ExternalWaitEntryPoint =
-      "PLACEHOLDER_EXTERNAL_WAIT";
-
+// TODO: Switch these checks to the external event UR entry points when they
+// are defined. Until then, the external operations use barrier placeholders.
+TEST_F(NativeRecordingTest, ExternalWaitMaterializesAndReusesHandle) {
   auto Graph = makeGraph();
-  auto Ctx = Queue.get_context();
   experimental::properties External{experimental::graph_external{}};
-
-  // Never signaled, so the UR event has to be materialized up front for the
-  // graph to reference it.
-  auto UnsignaledEvent1 = experimental::make_event(Ctx);
-  auto UnsignaledEvent2 = experimental::make_event(Ctx);
-  // Signaled before recording, so the existing UR event is reused.
-  auto SignaledEvent1 = experimental::make_event(Ctx);
-  auto SignaledEvent2 = experimental::make_event(Ctx);
-  experimental::enqueue_signal_event(Queue, SignaledEvent1);
-  experimental::enqueue_signal_event(Queue, SignaledEvent2);
-
-  ur_event_handle_t SignaledHandle1 =
-      getSyclObjImpl(SignaledEvent1)->getHandle();
-  ur_event_handle_t SignaledHandle2 =
-      getSyclObjImpl(SignaledEvent2)->getHandle();
-  ASSERT_NE(SignaledHandle1, nullptr);
-  ASSERT_NE(SignaledHandle2, nullptr);
-  ASSERT_EQ(getSyclObjImpl(UnsignaledEvent1)->getHandle(), nullptr);
-  ASSERT_EQ(getSyclObjImpl(UnsignaledEvent2)->getHandle(), nullptr);
-  const size_t BarriersBeforeRecording =
-      traceCount("urEnqueueEventsWaitWithBarrierExt");
+  auto Event = experimental::make_event(Queue.get_context());
+  auto EventImpl = getSyclObjImpl(Event);
+  ASSERT_EQ(EventImpl->getHandle(), nullptr);
 
   Graph.begin_recording(Queue);
-  experimental::enqueue_wait_event(Queue, UnsignaledEvent1, External);
-  experimental::enqueue_wait_event(Queue, SignaledEvent1, External);
-  experimental::enqueue_wait_events(Queue, {UnsignaledEvent2, SignaledEvent2},
-                                    External);
+  experimental::enqueue_wait_event(Queue, Event, External);
+  auto Handle = EventImpl->getHandle();
+  ASSERT_NE(Handle, nullptr);
+  EXPECT_TRUE(EventImpl->isGraphExternalMaterialized());
+
+  experimental::enqueue_wait_event(Queue, Event, External);
+  EXPECT_EQ(EventImpl->getHandle(), Handle);
+  experimental::enqueue_wait_events(Queue, {Event}, External);
+  EXPECT_EQ(EventImpl->getHandle(), Handle);
+
   Queue.submit(
       [&](sycl::handler &CGH) { CGH.single_task<TestKernel>([]() {}); });
   Graph.end_recording(Queue);
 
-  ur_event_handle_t UnsignaledHandle1 =
-      getSyclObjImpl(UnsignaledEvent1)->getHandle();
-  ur_event_handle_t UnsignaledHandle2 =
-      getSyclObjImpl(UnsignaledEvent2)->getHandle();
-  EXPECT_NE(UnsignaledHandle1, nullptr);
-  EXPECT_NE(UnsignaledHandle2, nullptr);
-  EXPECT_TRUE(getSyclObjImpl(UnsignaledEvent1)->isGraphExternalMaterialized());
-  EXPECT_TRUE(getSyclObjImpl(UnsignaledEvent2)->isGraphExternalMaterialized());
-  EXPECT_EQ(getSyclObjImpl(SignaledEvent1)->getHandle(), SignaledHandle1);
-  EXPECT_EQ(getSyclObjImpl(SignaledEvent2)->getHandle(), SignaledHandle2);
+  sycl::queue OtherQueue{Queue.get_context(), Dev,
+                         {sycl::property::queue::in_order{}}};
+  experimental::enqueue_signal_event(OtherQueue, Event);
+  EXPECT_EQ(EventImpl->getHandle(), Handle);
+  experimental::enqueue_wait_event(Queue, Event);
+  EXPECT_EQ(EventImpl->getHandle(), Handle);
 
-  EXPECT_EQ(traceCount("urEnqueueEventsWaitWithBarrierExt"),
-            BarriersBeforeRecording);
-  ASSERT_EQ(traceCount("urEnqueueKernelLaunchWithArgsExp"), 1u);
+  EXPECT_EQ(getUrWaitLists("urEnqueueEventsWaitWithBarrierExt"),
+            (UrWaitLists{{Handle}, {Handle}, {Handle}, {}, {Handle}}));
+  size_t SignalsWithHandle = 0;
+  for (const auto &Entry : state().Trace) {
+    if (Entry.EntryPoint == "urEnqueueEventsWaitWithBarrierExt" &&
+        Entry.OutputEvent == Handle)
+      ++SignalsWithHandle;
+  }
+  EXPECT_EQ(SignalsWithHandle, 1u);
+}
 
-  // ASSERT_EQ(traceCount(ExternalWaitEntryPoint), 3u);
-  // EXPECT_EQ(getUrWaitLists(ExternalWaitEntryPoint),
-  //           (UrWaitLists{{UnsignaledHandle1},
-  //                        {SignaledHandle1},
-  //                        {UnsignaledHandle2, SignaledHandle2}}));
-  // EXPECT_LT(traceIndex("urQueueBeginCaptureIntoGraphExp"),
-  //           traceIndex(ExternalWaitEntryPoint));
-  // EXPECT_LT(traceIndex(ExternalWaitEntryPoint),
-  //           traceIndex("urEnqueueKernelLaunchWithArgsExp"));
-  (void)ExternalWaitEntryPoint;
+TEST_F(NativeRecordingTest, ExternalWaitAndSignalUseSameHandle) {
+  auto Graph = makeGraph();
+  experimental::properties External{experimental::graph_external{}};
+  auto Event = experimental::make_event(Queue.get_context());
+
+  Graph.begin_recording(Queue);
+  experimental::enqueue_wait_event(Queue, Event, External);
+  auto Handle = getSyclObjImpl(Event)->getHandle();
+  ASSERT_NE(Handle, nullptr);
+  Queue.submit(
+      [&](sycl::handler &CGH) { CGH.single_task<TestKernel>([]() {}); });
+  experimental::enqueue_signal_event(Queue, Event, External);
+  Graph.end_recording(Queue);
+
+  EXPECT_EQ(getSyclObjImpl(Event)->getHandle(), Handle);
+  EXPECT_EQ(getUrWaitLists("urEnqueueEventsWaitWithBarrierExt"),
+            (UrWaitLists{{Handle}, {}}));
+  size_t SignalsWithHandle = 0;
+  for (const auto &Entry : state().Trace) {
+    if (Entry.EntryPoint == "urEnqueueEventsWaitWithBarrierExt" &&
+        Entry.OutputEvent == Handle)
+      ++SignalsWithHandle;
+  }
+  EXPECT_EQ(SignalsWithHandle, 1u);
+}
+
+TEST_F(NativeRecordingTest, ExternalWaitReusesPreviouslySignaledHandle) {
+  auto Graph = makeGraph();
+  experimental::properties External{experimental::graph_external{}};
+  auto Event = experimental::make_event(Queue.get_context());
+  experimental::enqueue_signal_event(Queue, Event);
+  auto Handle = getSyclObjImpl(Event)->getHandle();
+  ASSERT_NE(Handle, nullptr);
+
+  Graph.begin_recording(Queue);
+  experimental::enqueue_wait_event(Queue, Event, External);
+  Graph.end_recording(Queue);
+
+  EXPECT_EQ(getSyclObjImpl(Event)->getHandle(), Handle);
+  EXPECT_EQ(getUrWaitLists("urEnqueueEventsWaitWithBarrierExt"),
+            (UrWaitLists{{}, {Handle}}));
 }
 
 TEST_F(NativeRecordingTest, ExternalSignalUrTrace) {
-  constexpr std::string_view ExternalSignalEntryPoint =
-      "PLACEHOLDER_EXTERNAL_SIGNAL";
-
   auto Graph = makeGraph();
   experimental::properties External{experimental::graph_external{}};
   auto SignalEvent = experimental::make_event(Queue.get_context());
@@ -383,15 +395,19 @@ TEST_F(NativeRecordingTest, ExternalSignalUrTrace) {
   experimental::enqueue_signal_event(Queue, SignalEvent, External);
   Graph.end_recording(Queue);
 
-  EXPECT_EQ(traceCount("urEnqueueEventsWaitWithBarrierExt"), 0u);
+  ASSERT_EQ(traceCount("urEnqueueEventsWaitWithBarrierExt"), 1u);
+  EXPECT_EQ(getUrWaitLists("urEnqueueEventsWaitWithBarrierExt"),
+            (UrWaitLists{{}}));
+  auto SignalHandle = getSyclObjImpl(SignalEvent)->getHandle();
+  ASSERT_NE(SignalHandle, nullptr);
+  const auto &Barrier =
+      state().Trace[traceIndex("urEnqueueEventsWaitWithBarrierExt")];
+  EXPECT_EQ(Barrier.OutputEvent, SignalHandle);
   ASSERT_EQ(traceCount("urEnqueueKernelLaunchWithArgsExp"), 1u);
-
-  // ASSERT_EQ(traceCount(ExternalSignalEntryPoint), 1u);
-  // EXPECT_LT(traceIndex("urEnqueueKernelLaunchWithArgsExp"),
-  //           traceIndex(ExternalSignalEntryPoint));
-  // EXPECT_LT(traceIndex(ExternalSignalEntryPoint),
-  //           traceIndex("urQueueEndGraphCaptureExp"));
-  (void)ExternalSignalEntryPoint;
+  EXPECT_LT(traceIndex("urEnqueueKernelLaunchWithArgsExp"),
+            traceIndex("urEnqueueEventsWaitWithBarrierExt"));
+  EXPECT_LT(traceIndex("urEnqueueEventsWaitWithBarrierExt"),
+            traceIndex("urQueueEndGraphCaptureExp"));
 }
 
 TEST_F(NativeRecordingTest, UnrecordedEventDepStillDropped) {

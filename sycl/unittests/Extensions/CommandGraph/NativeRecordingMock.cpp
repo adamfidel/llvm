@@ -24,8 +24,10 @@ MockState &state() {
 }
 
 void trace(std::string EntryPoint, const void *Handle,
-           std::optional<std::vector<ur_event_handle_t>> WaitList) {
-  state().Trace.push_back({std::move(EntryPoint), Handle, std::move(WaitList)});
+           std::optional<std::vector<ur_event_handle_t>> WaitList,
+           std::optional<ur_event_handle_t> OutputEvent) {
+  state().Trace.push_back({std::move(EntryPoint), Handle, std::move(WaitList),
+                           OutputEvent});
 }
 
 size_t traceCount(std::string_view EntryPoint) {
@@ -107,6 +109,21 @@ ur_result_t mock_urEnqueueKernelLaunchWithArgsExpBefore(void *pParams) {
     WaitEvents.assign(WaitList, WaitList + *Params.pnumEventsInWaitList);
   trace("urEnqueueKernelLaunchWithArgsExp", *Params.phQueue,
         std::move(WaitEvents));
+  return UR_RESULT_SUCCESS;
+}
+
+ur_result_t mock_urEnqueueEventsWaitWithBarrierExtBefore(void *pParams) {
+  auto Params =
+      *static_cast<ur_enqueue_events_wait_with_barrier_ext_params_t *>(pParams);
+  const ur_event_handle_t *WaitList = *Params.pphEventWaitList;
+  std::vector<ur_event_handle_t> WaitEvents;
+  if (*Params.pnumEventsInWaitList != 0)
+    WaitEvents.assign(WaitList, WaitList + *Params.pnumEventsInWaitList);
+  std::optional<ur_event_handle_t> OutputEvent;
+  if (*Params.pphEvent)
+    OutputEvent = **Params.pphEvent;
+  trace("urEnqueueEventsWaitWithBarrierExt", *Params.phQueue,
+        std::move(WaitEvents), OutputEvent);
   return UR_RESULT_SUCCESS;
 }
 
@@ -262,9 +279,11 @@ void registerDefaultCallbacks() {
   mock::getCallbacks().set_before_callback(
       "urEnqueueKernelLaunchWithArgsExp",
       &mock_urEnqueueKernelLaunchWithArgsExpBefore);
+  mock::getCallbacks().set_before_callback(
+      "urEnqueueEventsWaitWithBarrierExt",
+      &mock_urEnqueueEventsWaitWithBarrierExtBefore);
 
   TRACE_UR_ENTRY_POINT(urCommandBufferCreateExp);
-  TRACE_UR_ENTRY_POINT(urEnqueueEventsWaitWithBarrierExt);
 }
 #undef TRACE_UR_ENTRY_POINT
 

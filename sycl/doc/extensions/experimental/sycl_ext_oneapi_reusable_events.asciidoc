@@ -416,15 +416,19 @@ objects.
 
 === Interaction with sycl_ext_oneapi_graph [[reusable-events-graph-interaction]]
 
-When the event operations defined by this extension are recorded in a
-`command_graph` without `graph_external{true}`, their usages are subject to the
-limitations defined in
+Reusable event operations submitted to a queue in the `queue_state::recording`
+state are captured in its modifiable `command_graph`.
+
+Without `graph_external{true}`, recorded reusable event signals and waits
+constitute dependency edges within the graph and are subject to the limitations
+defined in
 link:../experimental/sycl_ext_oneapi_graph.asciidoc#event-limitations[
-Event Limitations].
+Event Limitations]. These recorded operations have no observable effects
+outside the graph during replay.
 
 The same reusable event may be used by operations both inside and outside a
-graph. When `graph_external{true}` is not used, a wait must synchronize with a
-signal on the same side of the graph capture boundary.
+`command_graph`. A recorded signal or wait without `graph_external{true}` can
+synchronize only with operations in the same graph.
 
 === Interaction with other event APIs
 

@@ -380,6 +380,7 @@ TEST_F(NativeRecordingTest, ExternalWaitReusesPreviouslySignaledHandle) {
   Graph.end_recording(Queue);
 
   EXPECT_EQ(getSyclObjImpl(Event)->getHandle(), Handle);
+  EXPECT_FALSE(getSyclObjImpl(Event)->isGraphExternalMaterialized());
   EXPECT_EQ(getUrWaitLists("urEnqueueEventsWaitWithBarrierExt"),
             (UrWaitLists{{}, {Handle}}));
 }

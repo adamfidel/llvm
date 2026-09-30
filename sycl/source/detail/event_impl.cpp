@@ -264,13 +264,13 @@ void event_impl::materializeIPCEvent() {
 ur_event_handle_t event_impl::materializeGraphExternalEvent(queue_impl &Queue) {
   initContextIfNeeded();
 
-  if (getHandle() == nullptr)
+  if (getHandle() == nullptr) {
     setHandle(createDeviceUrEvent(Queue.getDeviceImpl(),
                                   /*UseDetachedEvent*/ true));
-
-  // A handle without a queue is otherwise indistinguishable from an interop
-  // event, which enqueue_signal_event rejects.
-  MGraphExternalMaterialized = true;
+    // A newly created handle without a queue is otherwise indistinguishable
+    // from an interop event, which enqueue_signal_event rejects.
+    MGraphExternalMaterialized = true;
+  }
 
   // Leaves MIsDefaultConstructed set so a later signal still runs through
   // getHandleReusable, which reuses this handle.

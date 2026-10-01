@@ -159,6 +159,7 @@ __SYCL_EXPORT void enqueue_signal_event(sycl::queue q, event &evt,
 
 } // namespace detail
 
+// Keep these entry points for binaries built with earlier headers.
 __SYCL_EXPORT void enqueue_wait_event(sycl::queue q, const event &evt) {
   detail::enqueue_wait_event(q, evt, /*Flags*/ 0);
 }

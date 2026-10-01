@@ -151,11 +151,6 @@ make_event(PropertyT prop) {
   return make_event(properties{prop});
 }
 
-__SYCL_EXPORT void enqueue_wait_event(sycl::queue q, const event &evt);
-__SYCL_EXPORT void enqueue_wait_events(sycl::queue q,
-                                       const std::vector<event> &evts);
-__SYCL_EXPORT void enqueue_signal_event(sycl::queue q, event &evt);
-
 template <typename PropertyListT = empty_properties_t>
 inline void enqueue_wait_event(sycl::queue q, const event &evt,
                                PropertyListT props = {}) {

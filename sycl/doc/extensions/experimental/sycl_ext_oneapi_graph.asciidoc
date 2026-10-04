@@ -2731,6 +2731,10 @@ will throw an exception if attempted:
 | Ending recording seals the graph capture leaving it unable to accept more nodes.
 | `feature_not_supported`
 
+| Events from submissions within a graph used outside that graph
+| Events signaled during native capture are scoped to the graph and may not be used for synchronization outside it.
+| _(behavior undefined)_
+
 | `get_nodes()` / `get_root_nodes()`
 | No SYCL node model is built during native capture.
 | `invalid`

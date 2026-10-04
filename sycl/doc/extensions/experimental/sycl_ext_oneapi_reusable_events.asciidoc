@@ -416,9 +416,9 @@ It is undefined behavior to destroy a reusable event used as a graph external si
 or wait prior to destroying its associated modifiable and executable `command_graph`
 objects.
 
-TODO: 
-- enqueue_signal_event with graph_external + depends_on for that event = external sync for an intra-graph edge 
-- look up other vendors 
+It is undefined behavior to use a reusable event operation recorded with
+`graph_external{true}` to establish a dependency between commands in the same
+same modifiable `command_graph`.
 
 === Interaction with sycl_ext_oneapi_graph [[reusable-events-graph-interaction]]
 

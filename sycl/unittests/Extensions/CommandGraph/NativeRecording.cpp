@@ -301,6 +301,19 @@ TEST_F(NativeRecordingTest, ExternalWaitDepReachesUr) {
 
 // TODO: Switch these checks to the external event UR entry points when they
 // are defined. Until then, the external operations use barrier placeholders.
+TEST_F(NativeRecordingTest, EmptyExternalWaitDoesNotEnqueueBarrier) {
+  auto Graph = makeGraph();
+  experimental::properties External{experimental::graph_external{}};
+
+  Graph.begin_recording(Queue);
+  Queue.submit(
+      [&](sycl::handler &CGH) { CGH.single_task<TestKernel>([]() {}); });
+  experimental::enqueue_wait_events(Queue, {}, External);
+  Graph.end_recording(Queue);
+
+  EXPECT_EQ(traceCount("urEnqueueEventsWaitWithBarrierExt"), 0u);
+}
+
 TEST_F(NativeRecordingTest, ExternalWaitMaterializesAndReusesHandle) {
   auto Graph = makeGraph();
   experimental::properties External{experimental::graph_external{}};

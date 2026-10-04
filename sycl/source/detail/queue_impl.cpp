@@ -585,20 +585,18 @@ EventImplPtr queue_impl::submit_barrier_scheduler_bypass(
 void queue_impl::submit_graph_external_wait_scheduler_bypass(
     std::vector<detail::EventImplPtr> &ExternalDepEvents,
     std::vector<detail::EventImplPtr> &DepEvents) {
-  if (!DepEvents.empty()) {
-    std::vector<ur_event_handle_t> RawDepEvents =
-        detail::Command::getUrEvents(DepEvents, this, false);
-    if (!RawDepEvents.empty()) {
-      getAdapter().call<UrApiKind::urEnqueueEventsWait>(
-          getHandleRef(), RawDepEvents.size(), RawDepEvents.data(), nullptr);
-    }
+  std::vector<ur_event_handle_t> RawDepEvents;
+  if (!DepEvents.empty())
+    RawDepEvents = detail::Command::getUrEvents(DepEvents, this, false);
+
+  if (ExternalDepEvents.empty() && RawDepEvents.empty())
+    return;
+
+  if (!RawDepEvents.empty()) {
+    getAdapter().call<UrApiKind::urEnqueueEventsWait>(
+        getHandleRef(), RawDepEvents.size(), RawDepEvents.data(), nullptr);
   }
 
-  // The handles are collected directly instead of through
-  // Command::getUrEvents so that its in-order redundancy filtering cannot drop
-  // an event which is external to the graph. An event which was never signaled
-  // gets its handle created here, under the queue lock, so the graph has
-  // something to reference until the later signal.
   std::vector<ur_event_handle_t> ExternalWaitList;
   ExternalWaitList.reserve(ExternalDepEvents.size());
   for (const EventImplPtr &Dep : ExternalDepEvents)
@@ -670,6 +668,13 @@ void queue_impl::submit_graph_external_direct_impl(
       throw sycl::exception(sycl::make_error_code(errc::invalid),
                             "graph_external events are not supported on a "
                             "queue recording a non-native graph.");
+    } else if (!isInOrder()) {
+      // Additional handling is required to implement support with
+      // out-of-order queue which is dependent on native recording
+      // supporting it first.
+      throw sycl::exception(sycl::make_error_code(errc::invalid),
+                            "graph_external events are only supported "
+                            "with in-order queues.");
     }
 
     std::vector<detail::EventImplPtr> ExternalDepEventImpls;
@@ -677,9 +682,6 @@ void queue_impl::submit_graph_external_direct_impl(
     for (const event &Event : ExternalDepEvents)
       ExternalDepEventImpls.emplace_back(detail::getSyclObjImpl(Event));
 
-    // Same limitation as the reusable event barriers: the external wait or
-    // signal is submitted directly to the backend, so every dependency must
-    // already be enqueued there.
     if (!detail::Scheduler::areEventsSafeForSchedulerBypass(
             ExternalDepEventImpls, getContextImpl()) ||
         !detail::Scheduler::areEventsSafeForSchedulerBypass(CGData.MEvents,

@@ -417,7 +417,7 @@ signal or wait prior to destroying its associated modifiable and executable
 
 It is undefined behavior to use a reusable event operation submitted with
 `graph_external{true}` to establish a dependency between commands in the same
-`command_graph` unless through separate instances of its execution.
+same `command_graph` unless the event spans two different executions of the same graph.
 
 === Interaction with sycl_ext_oneapi_graph [[reusable-events-graph-interaction]]
 

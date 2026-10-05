@@ -130,8 +130,8 @@ event make_event(const context &ctxt, PropertyListT props = {});
 
 _Constraints:_
 
-* `PropertyListT` is one of the properties listed below in section
-  "New properties for creating an event"; or
+* `PropertyListT` is one of the properties listed below in section "New properties
+  for creating an event"; or
 * `is_property_list_v<PropertyListT>` is `true` and contains no properties other
   than those listed below in section "New properties for creating an event".
 

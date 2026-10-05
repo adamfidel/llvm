@@ -130,8 +130,8 @@ event make_event(const context &ctxt, PropertyListT props = {});
 
 _Constraints:_
 
-* `PropertyListT` is one of the properties listed below in section "New properties
-  for creating an event"; or
+* `PropertyListT` is one of the properties listed below in section
+  "New properties for creating an event"; or
 * `is_property_list_v<PropertyListT>` is `true` and contains no properties other
   than those listed below in section "New properties for creating an event".
 
@@ -157,8 +157,8 @@ event make_event(PropertyListT props = {});
 
 _Constraints:_
 
-* `PropertyListT` is one of the properties listed below in section "New properties
-  for creating an event"; or
+* `PropertyListT` is one of the properties listed below in section
+  "New properties for creating an event"; or
 * `is_property_list_v<PropertyListT>` is `true` and contains no properties other
   than those listed below in section "New properties for creating an event".
 
@@ -385,13 +385,14 @@ indicating whether the operation may cross the graph boundary.
 
 '''
 
-When this property has the value `true`, the operation is recorded as an external
-event node of the graph. The nodes display the following behavior during graph replay:
+When this property has the value `true`, the operation is recorded as an
+external event node of the graph. The nodes display the following behavior
+during graph replay:
 
 * For `enqueue_wait_event` and `enqueue_wait_events`:
 
-** Submitting the executable graph (e.g., via `q.ext_oneapi_graph()) captures the command
-   that is associated with each event at the time of submission.
+** Submitting the executable graph (e.g., via `q.ext_oneapi_graph()`) captures
+   the command that is associated with each event at the time of submission.
 ** During graph execution, the wait node blocks until those commands
    complete.
 
@@ -407,18 +408,16 @@ event node of the graph. The nodes display the following behavior during graph r
    queried with `event::get_profiling_info()` if profiling is enabled on the
    event or queue.
 
-
-
 When this property has the value `false`, the operation behaves as if no
 `graph_external` property was provided.
 
-It is undefined behavior to destroy a reusable event used as a graph external signal
-or wait prior to destroying its associated modifiable and executable `command_graph`
-objects.
+It is undefined behavior to destroy a reusable event used as a graph external
+signal or wait prior to destroying its associated modifiable and executable
+`command_graph` objects.
 
 It is undefined behavior to use a reusable event operation submitted with
 `graph_external{true}` to establish a dependency between commands in the same
-same `command_graph` unless through separate instances of its execution.
+`command_graph` unless through separate instances of its execution.
 
 === Interaction with sycl_ext_oneapi_graph [[reusable-events-graph-interaction]]
 
@@ -433,8 +432,8 @@ Event Limitations]. These recorded operations have no observable effects
 outside the graph during replay.
 
 The same reusable event may be used by operations both inside and outside a
-`command_graph`. A recorded signal or wait without `graph_external{true}` can 
-only be used as a depedency for operations in the same graph.
+`command_graph`. A recorded signal or wait without `graph_external{true}` can
+only be used as a dependency for operations in the same graph.
 
 === Interaction with other event APIs
 
@@ -538,7 +537,6 @@ int main() {
 }
 ----
 
-
 === Graph external synchronizations
 
 [source,c++]
@@ -563,21 +561,24 @@ int main() {
 
   // Wait for a signal which is produced outside of the graph.
   syclex::enqueue_wait_event(q_graph, eager_event,
-                             syclex::properties{syclex::graph_external{}});
+                            syclex::properties{syclex::graph_external{}});
 
-  syclex::parallel_for(q_graph, sycl::range{N}, [=](sycl::item<> it) { /* ... */ });
+  syclex::parallel_for(q_graph, sycl::range{N},
+                      [=](sycl::item<> it) { /* ... */ });
 
   // Signal an event which is observed outside of the graph.
   syclex::enqueue_signal_event(q_graph, graph_event,
-                               syclex::properties{syclex::graph_external{}});
+                              syclex::properties{syclex::graph_external{}});
 
-  syclex::parallel_for(q_graph, sycl::range{N}, [=](sycl::item<> it) { /* ... */ });
+  syclex::parallel_for(q_graph, sycl::range{N},
+                      [=](sycl::item<> it) { /* ... */ });
 
   graph.end_recording();
   auto exec = graph.finalize();
 
   for (int i = 0; i < 2; ++i) {
-    syclex::parallel_for(q_eager, sycl::range{N}, [=](sycl::item<> it) { /* ... */ });
+    syclex::parallel_for(q_eager, sycl::range{N},
+                        [=](sycl::item<> it) { /* ... */ });
     syclex::enqueue_signal_event(q_eager, eager_event);
 
     sycl::event graph_submission = q_graph.ext_oneapi_graph(exec);
@@ -588,7 +589,6 @@ int main() {
   q_graph.wait();
 }
 ----
-
 
 === Timing a region of a graph
 
@@ -618,20 +618,22 @@ int main() {
       ctxt, dev, {syclex::property::graph::enable_native_recording{}}};
   graph.begin_recording(q);
 
-  syclex::parallel_for(q, sycl::range{N}, [=](sycl::item<> it) { /* untimed */ });
+  syclex::parallel_for(q, sycl::range{N},
+                      [=](sycl::item<> it) { /* untimed */ });
 
   // Start of the timed region.
   syclex::enqueue_signal_event(q, start,
-                               syclex::properties{syclex::graph_external{}});
+                              syclex::properties{syclex::graph_external{}});
 
   syclex::parallel_for(q, sycl::range{N}, [=](sycl::item<> it) { /* timed */ });
   syclex::parallel_for(q, sycl::range{N}, [=](sycl::item<> it) { /* timed */ });
 
   // End of the timed region.
   syclex::enqueue_signal_event(q, end,
-                               syclex::properties{syclex::graph_external{}});
+                              syclex::properties{syclex::graph_external{}});
 
-  syclex::parallel_for(q, sycl::range{N}, [=](sycl::item<> it) { /* untimed */ });
+  syclex::parallel_for(q, sycl::range{N},
+                      [=](sycl::item<> it) { /* untimed */ });
 
   graph.end_recording();
   auto exec = graph.finalize();

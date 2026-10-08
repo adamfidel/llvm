@@ -21,21 +21,10 @@ int main() {
 
   auto GraphEvent = Queue.single_task([]() {});
 
-  // TODO: The SYCL graph spec mandates errc::invalid but L0 graph's generic
-  // error codes make it difficult to determine the root cause. Once L0 graph
-  // expands their error codes we can add our handling and return the correct
-  // SYCL code along with a descriptive message to the user.
-#ifdef GRAPH_E2E_NATIVE_RECORDING
-  if (!expectException([&]() { GraphEvent.wait(); },
-                       "event wait during graph recording", errc::runtime)) {
-    return 1;
-  }
-#else
   if (!expectException([&]() { GraphEvent.wait(); },
                        "event wait during graph recording", errc::invalid)) {
     return 1;
   }
-#endif
 
   Graph.end_recording();
 

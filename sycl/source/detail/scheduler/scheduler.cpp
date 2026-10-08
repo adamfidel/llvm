@@ -198,7 +198,8 @@ void Scheduler::enqueueCommandForCG(event_impl &Event,
         if (!Enqueued && EnqueueResultT::SyclEnqueueFailed == Res.MResult) {
           throw sycl::detail::set_ur_error(
               sycl::exception(
-                  sycl::make_error_code(errc::runtime),
+                  sycl::make_error_code(
+                      sycl::detail::defaultErrcForUrResult(Res.MErrCode)),
                   std::string("Enqueue process failed.\n") +
                       (NewCmd->getWorkerContext()
                            ? __SYCL_UR_ERROR_REPORT(

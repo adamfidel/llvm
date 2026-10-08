@@ -17,6 +17,7 @@
 #include <unified-runtime/ur_api.h>
 
 #include <sycl/detail/export.hpp>
+#include <sycl/exception.hpp>
 
 #include <memory>
 #include <string>
@@ -33,6 +34,22 @@ const char *stringifyErrorCode(int32_t error);
 inline std::string codeToString(int32_t code) {
   return std::to_string(code) + " (" + std::string(stringifyErrorCode(code)) +
          ")";
+}
+
+/// Returns the errc a sycl::exception for the failed \p Result should carry.
+/// Graph capture codes that report misuse of native recording map to
+/// errc::invalid; every other code maps to errc::runtime.
+inline sycl::errc defaultErrcForUrResult(ur_result_t Result) {
+  switch (Result) {
+  case UR_RESULT_ERROR_GRAPH_CAPTURE_UNSUPPORTED:
+  case UR_RESULT_ERROR_GRAPH_CAPTURE_INVALIDATED:
+  case UR_RESULT_ERROR_GRAPH_CAPTURE_MERGE_ATTEMPT:
+  case UR_RESULT_ERROR_GRAPH_UNJOINED_FORKS:
+  case UR_RESULT_ERROR_GRAPH_INTERNAL_EVENT:
+    return sycl::errc::invalid;
+  default:
+    return sycl::errc::runtime;
+  }
 }
 
 namespace ur {

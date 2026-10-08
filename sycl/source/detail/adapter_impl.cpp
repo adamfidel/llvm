@@ -39,6 +39,8 @@ void adapter_impl::ur_failed_throw_exception(sycl::errc errc,
                  std::to_string(adapter_error) + "\n";
   }
 
+  if (errc == sycl::errc::runtime)
+    errc = defaultErrcForUrResult(ur_result);
   throw set_ur_error(sycl::exception(sycl::make_error_code(errc), message),
                      ur_result);
 }

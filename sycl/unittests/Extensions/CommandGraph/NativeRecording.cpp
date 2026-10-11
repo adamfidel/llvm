@@ -18,6 +18,7 @@ using NativeRecordingMock::state;
 using NativeRecordingMock::traceCount;
 using NativeRecordingMock::traceIndex;
 using NativeRecordingMock::UrWaitLists;
+using ::testing::HasSubstr;
 
 // Traces UR recording layer
 TEST_F(NativeRecordingTest, RecordingUrTrace) {
@@ -422,6 +423,41 @@ TEST_F(NativeRecordingTest, ExternalSignalUrTrace) {
             traceIndex("urEnqueueEventsWaitWithBarrierExt"));
   EXPECT_LT(traceIndex("urEnqueueEventsWaitWithBarrierExt"),
             traceIndex("urQueueEndGraphCaptureExp"));
+}
+
+TEST_F(NativeRecordingTest, ExternalEventsThrowWithoutRecording) {
+  experimental::properties External{experimental::graph_external{}};
+  auto Event = experimental::make_event(Queue.get_context());
+
+  std::string Message = expectFailure(
+      [&]() { experimental::enqueue_signal_event(Queue, Event, External); },
+      std::nullopt, sycl::errc::invalid);
+  EXPECT_THAT(Message, HasSubstr("only supported with native recording"));
+  Message = expectFailure(
+      [&]() { experimental::enqueue_wait_event(Queue, Event, External); },
+      std::nullopt, sycl::errc::invalid);
+  EXPECT_THAT(Message, HasSubstr("only supported with native recording"));
+  EXPECT_EQ(traceCount("urEnqueueEventsWaitWithBarrierExt"), 0u);
+}
+
+TEST_F(NativeRecordingTest, ExternalEventsThrowWhenRecordingNonNativeGraph) {
+  experimental::properties External{experimental::graph_external{}};
+  auto Event = experimental::make_event(Queue.get_context());
+  ModifiableGraph Graph{Queue.get_context(), Dev};
+
+  Graph.begin_recording(Queue);
+  // Signaling on a queue recording any graph is rejected before the
+  // graph_external handling is reached.
+  std::string Message = expectFailure(
+      [&]() { experimental::enqueue_signal_event(Queue, Event, External); },
+      std::nullopt, sycl::errc::feature_not_supported);
+  EXPECT_THAT(Message, HasSubstr("queue which is recording a graph"));
+  Message = expectFailure(
+      [&]() { experimental::enqueue_wait_event(Queue, Event, External); },
+      std::nullopt, sycl::errc::invalid);
+  EXPECT_THAT(Message, HasSubstr("only supported with native recording"));
+  Graph.end_recording(Queue);
+  EXPECT_EQ(traceCount("urEnqueueEventsWaitWithBarrierExt"), 0u);
 }
 
 TEST_F(NativeRecordingTest, UnrecordedEventDepStillDropped) {

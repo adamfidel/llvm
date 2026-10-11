@@ -131,7 +131,7 @@ __SYCL_EXPORT void enqueue_signal_event(sycl::queue q, event &evt,
   }
 
   if (QueueImpl.hasCommandGraph()) {
-    throw sycl::exception(sycl::make_error_code(errc::runtime),
+    throw sycl::exception(sycl::make_error_code(errc::feature_not_supported),
                           "Enqueueing an event for signaling is not supported "
                           "on a queue which is recording a graph.");
   }

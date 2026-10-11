@@ -664,15 +664,15 @@ void queue_impl::submit_graph_external_direct_impl(
 
   auto SubmitExternalFunc = [&](detail::CG::StorageInitHelper &&CGData)
       -> std::pair<EventImplPtr, bool> {
-    if (hasCommandGraph()) {
+    if (!getContextImpl().isNativeRecordingActive() || !isNativeRecording()) {
       throw sycl::exception(sycl::make_error_code(errc::invalid),
-                            "graph_external events are not supported on a "
-                            "queue recording a non-native graph.");
+                            "graph_external events are only supported "
+                            "with native recording.");
     } else if (!isInOrder()) {
       // Additional handling is required to implement support with
       // out-of-order queue which is dependent on native recording
       // supporting it first.
-      throw sycl::exception(sycl::make_error_code(errc::invalid),
+      throw sycl::exception(sycl::make_error_code(errc::feature_not_supported),
                             "graph_external events are only supported "
                             "with in-order queues.");
     }

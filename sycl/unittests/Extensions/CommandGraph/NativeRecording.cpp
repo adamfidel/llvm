@@ -425,6 +425,33 @@ TEST_F(NativeRecordingTest, ExternalSignalUrTrace) {
             traceIndex("urQueueEndGraphCaptureExp"));
 }
 
+TEST_F(NativeRecordingTest, GraphKeepsExternalEventsAlive) {
+  experimental::properties External{experimental::graph_external{}};
+  std::weak_ptr<sycl::detail::event_impl> WaitEventImpl;
+  std::weak_ptr<sycl::detail::event_impl> SignalEventImpl;
+  std::optional<ModifiableGraph> Graph{makeGraph()};
+
+  {
+    auto WaitEvent = experimental::make_event(Queue.get_context());
+    auto SignalEvent = experimental::make_event(Queue.get_context());
+    WaitEventImpl = getSyclObjImpl(WaitEvent);
+    SignalEventImpl = getSyclObjImpl(SignalEvent);
+
+    Graph->begin_recording(Queue);
+    experimental::enqueue_wait_event(Queue, WaitEvent, External);
+    experimental::enqueue_wait_events(Queue, {WaitEvent}, External);
+    experimental::enqueue_signal_event(Queue, SignalEvent, External);
+    Graph->end_recording(Queue);
+  }
+
+  EXPECT_FALSE(WaitEventImpl.expired());
+  EXPECT_FALSE(SignalEventImpl.expired());
+
+  Graph.reset();
+  EXPECT_TRUE(WaitEventImpl.expired());
+  EXPECT_TRUE(SignalEventImpl.expired());
+}
+
 TEST_F(NativeRecordingTest, ExternalEventsThrowWithoutRecording) {
   experimental::properties External{experimental::graph_external{}};
   auto Event = experimental::make_event(Queue.get_context());

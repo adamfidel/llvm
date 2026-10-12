@@ -612,6 +612,11 @@ void queue_impl::submit_graph_external_wait_scheduler_bypass(
   getAdapter().call<UrApiKind::urEnqueueEventsWaitWithBarrierExt>(
       getHandleRef(), nullptr, ExternalWaitList.size(), ExternalWaitList.data(),
       nullptr);
+
+  if (auto Graph = ext_oneapi_get_graph_impl())
+    Graph->addGraphExternalEvents(ExternalDepEvents);
+  else
+    assert(false && "Native recording graph unexpectedly lost");
 }
 
 void queue_impl::submit_graph_external_signal_scheduler_bypass(
@@ -643,6 +648,11 @@ void queue_impl::submit_graph_external_signal_scheduler_bypass(
   // then the signal is an ordinary barrier captured into the graph.
   getAdapter().call<UrApiKind::urEnqueueEventsWaitWithBarrierExt>(
       getHandleRef(), nullptr, 0, nullptr, &UREvent);
+
+  if (auto Graph = ext_oneapi_get_graph_impl())
+    Graph->addGraphExternalEvents({&EventForReuse, 1});
+  else
+    assert(false && "Native recording graph unexpectedly lost");
 
   EventForReuse->setHandleReusable(UREvent);
 }

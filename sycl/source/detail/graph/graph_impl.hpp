@@ -13,15 +13,17 @@
 #include <detail/event_impl.hpp>    // for event_impl
 #include <sycl/detail/cg_types.hpp> // for CGType
 #include <sycl/detail/os_util.hpp>  // for OS utils
+#include <sycl/sycl_span.hpp>       // for span
 
-#include <fstream>      // for fstream
-#include <functional>   // for function
-#include <list>         // for list
-#include <memory>       // for shared_ptr
-#include <optional>     // for optional
-#include <set>          // for set
-#include <shared_mutex> // for shared_mutex
-#include <vector>       // for vector
+#include <fstream>       // for fstream
+#include <functional>    // for function
+#include <list>          // for list
+#include <memory>        // for shared_ptr
+#include <optional>      // for optional
+#include <set>           // for set
+#include <shared_mutex>  // for shared_mutex
+#include <unordered_set> // for unordered_set
+#include <vector>        // for vector
 
 // Forward declare UR types
 struct ur_exp_graph_handle_t_;
@@ -568,6 +570,12 @@ public:
   detail::EnqueueHostTaskData *
   addNativeHostTaskCallback(std::unique_ptr<detail::EnqueueHostTaskData> Data);
 
+  /// Keep alive events waited on or signaled with graph_external while
+  /// natively recording, as the native graph references their UR handles.
+  /// @param Events Events to keep alive for the lifetime of this graph.
+  void
+  addGraphExternalEvents(sycl::span<const sycl::detail::EventImplPtr> Events);
+
 private:
   template <typename... Ts> node_impl &createNode(Ts &&...Args) {
     MNodeStorage.push_back(
@@ -642,6 +650,9 @@ private:
   /// Callback data for host tasks recorded in native recording mode.
   std::vector<std::unique_ptr<detail::EnqueueHostTaskData>>
       MNativeHostTaskCallbacks;
+
+  /// Events external to the graph which the native graph waits on or signals.
+  std::unordered_set<sycl::detail::EventImplPtr> MGraphExternalEvents;
 
   /// Mapping from queues to barrier nodes. For each queue the last barrier
   /// node recorded to the graph from the queue is stored.

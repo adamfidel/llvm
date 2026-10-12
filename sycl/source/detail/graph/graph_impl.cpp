@@ -715,6 +715,12 @@ sycl::detail::EnqueueHostTaskData *graph_impl::addNativeHostTaskCallback(
   return MNativeHostTaskCallbacks.back().get();
 }
 
+void graph_impl::addGraphExternalEvents(
+    sycl::span<const sycl::detail::EventImplPtr> Events) {
+  graph_impl::WriteLock Lock(MMutex);
+  MGraphExternalEvents.insert(Events.begin(), Events.end());
+}
+
 void graph_impl::clearQueues(bool NeedsLock) {
   graph_impl::RecQueuesStorage SwappedQueues;
   {

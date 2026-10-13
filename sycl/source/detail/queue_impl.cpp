@@ -585,17 +585,19 @@ EventImplPtr queue_impl::submit_barrier_scheduler_bypass(
 
 void queue_impl::submit_graph_external_wait_scheduler_bypass(
     std::vector<detail::EventImplPtr> &ExternalDepEvents,
-    std::vector<detail::EventImplPtr> &DepEvents) {
-  std::vector<ur_event_handle_t> RawDepEvents;
-  if (!DepEvents.empty())
-    RawDepEvents = detail::Command::getUrEvents(DepEvents, this, false);
+    std::vector<detail::EventImplPtr> &QueueDepEvents) {
+  std::vector<ur_event_handle_t> RawQueueDepEvents;
+  if (!QueueDepEvents.empty())
+    RawQueueDepEvents =
+        detail::Command::getUrEvents(QueueDepEvents, this, false);
 
-  if (ExternalDepEvents.empty() && RawDepEvents.empty())
+  if (ExternalDepEvents.empty() && RawQueueDepEvents.empty())
     return;
 
-  if (!RawDepEvents.empty()) {
+  if (!RawQueueDepEvents.empty()) {
     getAdapter().call<UrApiKind::urEnqueueEventsWait>(
-        getHandleRef(), RawDepEvents.size(), RawDepEvents.data(), nullptr);
+        getHandleRef(), RawQueueDepEvents.size(), RawQueueDepEvents.data(),
+        nullptr);
   }
 
   std::vector<ur_event_handle_t> ExternalWaitList;
@@ -620,13 +622,14 @@ void queue_impl::submit_graph_external_wait_scheduler_bypass(
 }
 
 void queue_impl::submit_graph_external_signal_scheduler_bypass(
-    std::vector<detail::EventImplPtr> &DepEvents,
+    std::vector<detail::EventImplPtr> &QueueDepEvents,
     const EventImplPtr &EventForReuse) {
   ur_event_handle_t UREvent = EventForReuse->getHandleReusable(*this);
 
-  std::vector<ur_event_handle_t> RawDepEvents;
-  if (!DepEvents.empty())
-    RawDepEvents = detail::Command::getUrEvents(DepEvents, this, false);
+  std::vector<ur_event_handle_t> RawQueueDepEvents;
+  if (!QueueDepEvents.empty())
+    RawQueueDepEvents =
+        detail::Command::getUrEvents(QueueDepEvents, this, false);
 
   EventForReuse->setQueue(*this);
   EventForReuse->setWorkerQueue(weak_from_this());
@@ -637,9 +640,10 @@ void queue_impl::submit_graph_external_signal_scheduler_bypass(
   EventForReuse->setEnqueued();
   EventForReuse->setStateIncomplete();
 
-  if (!RawDepEvents.empty()) {
+  if (!RawQueueDepEvents.empty()) {
     getAdapter().call<UrApiKind::urEnqueueEventsWait>(
-        getHandleRef(), RawDepEvents.size(), RawDepEvents.data(), nullptr);
+        getHandleRef(), RawQueueDepEvents.size(), RawQueueDepEvents.data(),
+        nullptr);
   }
 
   std::cerr << "[TRACE] EXTERNAL_SIGNAL\n";

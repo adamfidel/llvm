@@ -498,18 +498,18 @@ public:
   /// scheduler. Must be called with the queue lock held from submit_direct.
   ///
   /// \param ExternalDepEvents are the events the graph waits on.
-  /// \param DepEvents are queue-level dependencies collected by submit_direct.
+  /// \param QueueDepEvents are implicit queue dependencies from submit_direct.
   void submit_graph_external_wait_scheduler_bypass(
       std::vector<detail::EventImplPtr> &ExternalDepEvents,
-      std::vector<detail::EventImplPtr> &DepEvents);
+      std::vector<detail::EventImplPtr> &QueueDepEvents);
 
   /// Records an external signal into the natively recorded graph, bypassing
   /// the scheduler. Must be called with the queue lock held from submit_direct.
   ///
-  /// \param DepEvents are queue-level dependencies collected by submit_direct.
+  /// \param QueueDepEvents are implicit queue dependencies from submit_direct.
   /// \param EventForReuse is the reusable event the graph signals.
   void submit_graph_external_signal_scheduler_bypass(
-      std::vector<detail::EventImplPtr> &DepEvents,
+      std::vector<detail::EventImplPtr> &QueueDepEvents,
       const EventImplPtr &EventForReuse);
 
   /// Completes the submission of an asynchronous allocation using the scheduler

@@ -22,8 +22,7 @@ int main() {
 
   QueueStateVerifier verifier(Queue);
 
-  exp_ext::properties EventProps{exp_ext::enable_profiling{true},
-                                 exp_ext::graph_external{true}};
+  exp_ext::properties EventProps{exp_ext::enable_profiling{true}};
   exp_ext::properties External{exp_ext::graph_external{}};
   event Event1 = exp_ext::make_event(Ctx, EventProps);
   event Event2 = exp_ext::make_event(Ctx, EventProps);

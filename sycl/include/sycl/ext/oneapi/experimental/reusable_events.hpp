@@ -72,7 +72,8 @@ template <>
 struct is_property_key_of<event_mode_key, sycl::event> : std::true_type {};
 
 template <>
-struct is_property_key_of<graph_external_key, sycl::event> : std::true_type {};
+struct is_property_key_of<graph_external_key, detail::enqueue_event_props>
+    : std::true_type {};
 
 namespace detail {
 enum make_event_flags : uint32_t {
@@ -102,6 +103,10 @@ uint32_t getMakeEventFlags(const PropertyListT &props) {
   return Flags;
 }
 
+enum enqueue_event_flags : uint32_t {
+  enqueue_event_flag_graph_external = 1u << 0,
+};
+
 __SYCL_EXPORT void enqueue_wait_event(sycl::queue q, const event &evt,
                                       uint32_t Flags);
 __SYCL_EXPORT void enqueue_wait_events(sycl::queue q,
@@ -110,10 +115,14 @@ __SYCL_EXPORT void enqueue_wait_events(sycl::queue q,
 __SYCL_EXPORT void enqueue_signal_event(sycl::queue q, event &evt,
                                         uint32_t Flags);
 
-// No properties are implemented for the enqueue functions yet.
 template <typename PropertyListT>
-uint32_t getEnqueueEventFlags(const PropertyListT &) {
-  return 0;
+uint32_t getEnqueueEventFlags(const PropertyListT &props) {
+  uint32_t Flags = 0;
+  if constexpr (PropertyListT::template has_property<graph_external_key>()) {
+    if (props.template get_property<graph_external_key>().value)
+      Flags |= enqueue_event_flag_graph_external;
+  }
+  return Flags;
 }
 } // namespace detail
 

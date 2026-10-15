@@ -77,19 +77,11 @@ static void CheckEventAndThrow(detail::event_impl &EventImpl,
 }
 
 __SYCL_EXPORT void enqueue_wait_event(sycl::queue q, const event &evt,
-                                      uint32_t Flags) {
-  const bool External = Flags & enqueue_event_flag_graph_external;
-
+                                      uint32_t /*Flags*/) {
   detail::queue_impl &QueueImpl = *sycl::detail::getSyclObjImpl(q);
   detail::event_impl &EventImpl = *sycl::detail::getSyclObjImpl(evt);
 
   CheckEventAndThrow(EventImpl, QueueImpl.getContextImpl());
-
-  if (External) {
-    QueueImpl.submit_graph_external_wait_direct(
-        sycl::span<const event>(&evt, 1));
-    return;
-  }
 
   QueueImpl.submit_barrier_direct_without_event(
       sycl::span<const event>(&evt, 1), detail::CGType::BarrierWaitlist,
@@ -98,9 +90,7 @@ __SYCL_EXPORT void enqueue_wait_event(sycl::queue q, const event &evt,
 
 __SYCL_EXPORT void enqueue_wait_events(sycl::queue q,
                                        const std::vector<event> &evts,
-                                       uint32_t Flags) {
-  const bool External = Flags & enqueue_event_flag_graph_external;
-
+                                       uint32_t /*Flags*/) {
   detail::queue_impl &QueueImpl = *sycl::detail::getSyclObjImpl(q);
 
   for (const sycl::event &evt : evts) {
@@ -108,19 +98,12 @@ __SYCL_EXPORT void enqueue_wait_events(sycl::queue q,
                        QueueImpl.getContextImpl());
   }
 
-  if (External) {
-    QueueImpl.submit_graph_external_wait_direct(evts);
-    return;
-  }
-
   QueueImpl.submit_barrier_direct_without_event(
       evts, detail::CGType::BarrierWaitlist, detail::code_location::current());
 }
 
 __SYCL_EXPORT void enqueue_signal_event(sycl::queue q, event &evt,
-                                        uint32_t Flags) {
-  const bool External = Flags & enqueue_event_flag_graph_external;
-
+                                        uint32_t /*Flags*/) {
   detail::queue_impl &QueueImpl = *sycl::detail::getSyclObjImpl(q);
   detail::event_impl &EventImpl = *sycl::detail::getSyclObjImpl(evt);
 
@@ -159,7 +142,7 @@ __SYCL_EXPORT void enqueue_signal_event(sycl::queue q, event &evt,
 
 } // namespace detail
 
-// Keep these entry points for binaries built with earlier headers.
+// These entry points are kept for backwards compatibility.
 __SYCL_EXPORT void enqueue_wait_event(sycl::queue q, const event &evt) {
   detail::enqueue_wait_event(q, evt, /*Flags*/ 0);
 }

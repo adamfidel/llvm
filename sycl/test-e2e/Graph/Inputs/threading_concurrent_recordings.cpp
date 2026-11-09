@@ -1,15 +1,16 @@
 // Tests independent graphs being created, recorded, finalized, executed and
 // destroyed concurrently, one per thread, on queues sharing a context. A
 // barrier after begin_recording makes every recording active at the same time,
-// so work captured into the wrong graph shows up as a wrong result.
+// so work captured into the wrong graph shows up as a wrong result. On
+// out-of-order queues the two kernels are ordered with an explicit event.
 
 #include "../graph_threading.hpp"
 
-int main() {
+bool runTest(const property_list &QueueProps) {
   queue Queue;
 
   const unsigned NumThreads = numTestThreads();
-  std::vector<queue> Queues = makeInOrderQueues(Queue, NumThreads);
+  std::vector<queue> Queues = makeQueues(Queue, NumThreads, QueueProps);
   Barrier AllRecording{NumThreads};
   std::vector<int> Passed(NumThreads, 0);
 
@@ -35,9 +36,10 @@ int main() {
     Graph.begin_recording(ThreadQueue);
     AllRecording.wait();
 
-    ThreadQueue.parallel_for(range<1>{Size},
-                             [=](id<1> Id) { Data[Id] += Increment; });
-    ThreadQueue.parallel_for(range<1>{Size}, [=](id<1> Id) { Data[Id] *= 2; });
+    event Add = ThreadQueue.parallel_for(
+        range<1>{Size}, [=](id<1> Id) { Data[Id] += Increment; });
+    ThreadQueue.parallel_for(range<1>{Size}, orderAfter(ThreadQueue, Add),
+                             [=](id<1> Id) { Data[Id] *= 2; });
 
     bool ThreadPassed = ThreadQueue.ext_oneapi_get_state() == RECORDING;
     Graph.end_recording(ThreadQueue);
@@ -46,6 +48,7 @@ int main() {
     auto ExecGraph = Graph.finalize();
     for (unsigned I = 0; I < Iterations; ++I)
       ThreadQueue.ext_oneapi_graph(ExecGraph);
+    ThreadQueue.wait_and_throw();
 
     std::vector<int> Result(Size);
     ThreadQueue.copy(Data, Result.data(), Size).wait_and_throw();
@@ -64,5 +67,7 @@ int main() {
 
   const bool AllPassed =
       std::all_of(Passed.begin(), Passed.end(), [](int P) { return P; });
-  return AllPassed ? 0 : 1;
+  return AllPassed;
 }
+
+int main() { return runWithQueueOrderings(runTest) ? 0 : 1; }

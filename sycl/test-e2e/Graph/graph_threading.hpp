@@ -56,15 +56,24 @@ void runConcurrently(unsigned NumThreads, FuncT &&Func,
     std::rethrow_exception(FirstError);
 }
 
-/// Creates NumQueues in-order queues sharing the context and device of Q.
-inline std::vector<queue> makeInOrderQueues(const queue &Q,
-                                            unsigned NumQueues) {
+/// Creates NumQueues queues with QueueProps sharing the context and device of
+/// Q.
+inline std::vector<queue> makeQueues(const queue &Q, unsigned NumQueues,
+                                     const property_list &QueueProps) {
   std::vector<queue> Queues;
   Queues.reserve(NumQueues);
   for (unsigned I = 0; I < NumQueues; ++I)
-    Queues.emplace_back(Q.get_context(), Q.get_device(),
-                        property::queue::in_order{});
+    Queues.emplace_back(Q.get_context(), Q.get_device(), QueueProps);
   return Queues;
+}
+
+/// Events a submission to Q needs to run after Prev. In-order queues order
+/// submissions implicitly, so none are returned and tests exercise that
+/// implicit ordering rather than masking it with explicit dependencies.
+inline std::vector<event> orderAfter(const queue &Q, const event &Prev) {
+  if (Q.is_in_order())
+    return {};
+  return {Prev};
 }
 
 /// Checks that every queue in Queues is in the Expected recording state.

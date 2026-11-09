@@ -1,14 +1,15 @@
 // Tests that work submitted from another thread to a non-recording queue in the
 // same context executes eagerly and is not captured while a graph is
 // recording. Barriers keep the whole unrelated workload inside the recording
-// window.
+// window. On out-of-order queues the unrelated work is ordered with explicit
+// events.
 
 #include "../graph_threading.hpp"
 
-int main() {
-  queue RecordQueue{property::queue::in_order{}};
+bool runTest(const property_list &QueueProps) {
+  queue RecordQueue{QueueProps};
   queue WorkQueue{RecordQueue.get_context(), RecordQueue.get_device(),
-                  property::queue::in_order{}};
+                  QueueProps};
 
 #ifdef GRAPH_E2E_NATIVE_RECORDING
   exp_ext::command_graph Graph{
@@ -47,15 +48,17 @@ int main() {
     RecordingStarted.wait();
     WorkPassed &= WorkQueue.ext_oneapi_get_state() == EXECUTING;
 
-    WorkQueue.parallel_for(
+    event Init = WorkQueue.parallel_for(
         range<1>{Size}, [=](id<1> Id) { Work[Id] = static_cast<int>(Id[0]); });
-    WorkQueue.submit([&](handler &CGH) {
+    event HostIncrement = WorkQueue.submit([&](handler &CGH) {
+      CGH.depends_on(orderAfter(WorkQueue, Init));
       CGH.host_task([=] {
         for (size_t I = 0; I < Size; ++I)
           Work[I] += 1;
       });
     });
-    WorkQueue.parallel_for(range<1>{Size}, [=](id<1> Id) { Work[Id] *= 3; });
+    WorkQueue.parallel_for(range<1>{Size}, orderAfter(WorkQueue, HostIncrement),
+                           [=](id<1> Id) { Work[Id] *= 3; });
     WorkQueue.wait_and_throw();
 
     for (size_t I = 0; I < Size; ++I) {
@@ -70,6 +73,7 @@ int main() {
   auto ExecGraph = Graph.finalize();
   for (unsigned I = 0; I < Iterations; ++I)
     RecordQueue.ext_oneapi_graph(ExecGraph);
+  RecordQueue.wait_and_throw();
 
   std::vector<int> Result(Size);
   RecordQueue.copy(Recorded, Result.data(), Size).wait_and_throw();
@@ -84,5 +88,7 @@ int main() {
   free(Recorded, RecordQueue);
   free(Work, WorkQueue);
 
-  return Passed ? 0 : 1;
+  return Passed;
 }
+
+int main() { return runWithQueueOrderings(runTest) ? 0 : 1; }

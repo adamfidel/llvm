@@ -2,8 +2,7 @@
 // The order in which threads' submissions interleave is undefined, so each
 // thread only touches its own slice of the data. Each thread's chain of kernels
 // is not commutative, so the chain must be ordered for the result to be
-// correct. Chains are ordered with explicit event dependencies so the same body
-// is valid for in-order and out-of-order queues.
+// correct. On out-of-order queues the chain is ordered with explicit events.
 
 #include "../graph_threading.hpp"
 
@@ -36,9 +35,9 @@ bool runTest(const property_list &QueueProps) {
 
     event PrevEvent = InitEvent;
     for (int Kernel = 0; Kernel < KernelsPerThread; ++Kernel)
-      PrevEvent = Queue.parallel_for(range<1>{Size}, PrevEvent, [=](id<1> Id) {
-        Slice[Id] = Slice[Id] * 2 + Thread + Kernel;
-      });
+      PrevEvent = Queue.parallel_for(
+          range<1>{Size}, orderAfter(Queue, PrevEvent),
+          [=](id<1> Id) { Slice[Id] = Slice[Id] * 2 + Thread + Kernel; });
   });
 
   bool Passed = Queue.ext_oneapi_get_state() == RECORDING;

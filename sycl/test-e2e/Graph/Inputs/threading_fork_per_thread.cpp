@@ -1,15 +1,15 @@
 // Tests recording a fork-join graph where each forked branch is recorded from
 // its own thread. The primary queue records a fork point, every thread then
-// concurrently submits a dependent chain of kernels to its own in-order queue,
-// which transitions that queue to recording. The primary queue joins all
-// branches.
+// concurrently submits a dependent chain of kernels to its own queue, which
+// transitions that queue to recording. The primary queue joins all branches.
+// On out-of-order queues each chain is ordered with explicit events.
 
 #include "../graph_threading.hpp"
 
 constexpr int KernelsPerThread = 4;
 
-int main() {
-  queue Primary{property::queue::in_order{}};
+bool runTest(const property_list &QueueProps) {
+  queue Primary{QueueProps};
 
 #ifdef GRAPH_E2E_NATIVE_RECORDING
   exp_ext::command_graph Graph{
@@ -21,7 +21,7 @@ int main() {
 #endif
 
   const unsigned NumForks = numTestThreads();
-  std::vector<queue> ForkQueues = makeInOrderQueues(Primary, NumForks);
+  std::vector<queue> ForkQueues = makeQueues(Primary, NumForks, QueueProps);
 
   int *Data = malloc_device<int>(Size * NumForks, Primary);
   int *Sum = malloc_device<int>(Size, Primary);
@@ -46,7 +46,8 @@ int main() {
 
     event Last = ForkQueue.parallel_for(range<1>{Size}, Fork, Step(0));
     for (int Kernel = 1; Kernel < KernelsPerThread; ++Kernel)
-      Last = ForkQueue.parallel_for(range<1>{Size}, Step(Kernel));
+      Last = ForkQueue.parallel_for(range<1>{Size}, orderAfter(ForkQueue, Last),
+                                    Step(Kernel));
     Joins[ThreadIndex] = Last;
   });
 
@@ -67,6 +68,7 @@ int main() {
   auto ExecGraph = Graph.finalize();
   for (unsigned I = 0; I < Iterations; ++I)
     Primary.ext_oneapi_graph(ExecGraph);
+  Primary.wait_and_throw();
 
   std::vector<int> HostSum(Size);
   Primary.copy(Sum, HostSum.data(), Size).wait_and_throw();
@@ -85,5 +87,7 @@ int main() {
   free(Data, Primary);
   free(Sum, Primary);
 
-  return Passed ? 0 : 1;
+  return Passed;
 }
+
+int main() { return runWithQueueOrderings(runTest) ? 0 : 1; }

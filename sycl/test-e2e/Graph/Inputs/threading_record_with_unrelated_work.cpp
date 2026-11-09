@@ -33,62 +33,39 @@ int main() {
   Barrier WorkDone{2};
   bool WorkPassed = true;
 
-  // A thread that throws must still reach every barrier, or the other thread
-  // blocks forever. Steps after a failure are skipped and the first exception
-  // is rethrown once the thread is past its last barrier.
-  auto RunUnlessFailed = [](std::exception_ptr &Error, auto &&Step) {
-    if (Error)
-      return;
-    try {
-      Step();
-    } catch (...) {
-      Error = std::current_exception();
-    }
-  };
-
-  runConcurrently(2, [&](unsigned ThreadIndex) {
-    std::exception_ptr Error;
-
+  auto RecordOrWork = [&](unsigned ThreadIndex) {
     if (ThreadIndex == RecorderThread) {
-      RunUnlessFailed(Error, [&] { Graph.begin_recording(RecordQueue); });
+      Graph.begin_recording(RecordQueue);
       RecordingStarted.wait();
-      RunUnlessFailed(Error, [&] {
-        RecordQueue.parallel_for(range<1>{Size}, [=](id<1> Id) {
-          Recorded[Id] += RecordedIncrement;
-        });
-      });
+      RecordQueue.parallel_for(
+          range<1>{Size}, [=](id<1> Id) { Recorded[Id] += RecordedIncrement; });
       WorkDone.wait();
-      RunUnlessFailed(Error, [&] { Graph.end_recording(RecordQueue); });
-    } else {
-      RecordingStarted.wait();
-      RunUnlessFailed(Error, [&] {
-        WorkPassed &= WorkQueue.ext_oneapi_get_state() == EXECUTING;
-
-        WorkQueue.parallel_for(range<1>{Size}, [=](id<1> Id) {
-          Work[Id] = static_cast<int>(Id[0]);
-        });
-        WorkQueue.submit([&](handler &CGH) {
-          CGH.host_task([=] {
-            for (size_t I = 0; I < Size; ++I)
-              Work[I] += 1;
-          });
-        });
-        WorkQueue.parallel_for(range<1>{Size},
-                               [=](id<1> Id) { Work[Id] *= 3; });
-        WorkQueue.wait_and_throw();
-
-        for (size_t I = 0; I < Size; ++I) {
-          const int Reference = (static_cast<int>(I) + 1) * 3;
-          WorkPassed &= check_value(I, Reference, Work[I], "Work");
-        }
-        WorkPassed &= WorkQueue.ext_oneapi_get_state() == EXECUTING;
-      });
-      WorkDone.wait();
+      Graph.end_recording(RecordQueue);
+      return;
     }
 
-    if (Error)
-      std::rethrow_exception(Error);
-  });
+    RecordingStarted.wait();
+    WorkPassed &= WorkQueue.ext_oneapi_get_state() == EXECUTING;
+
+    WorkQueue.parallel_for(
+        range<1>{Size}, [=](id<1> Id) { Work[Id] = static_cast<int>(Id[0]); });
+    WorkQueue.submit([&](handler &CGH) {
+      CGH.host_task([=] {
+        for (size_t I = 0; I < Size; ++I)
+          Work[I] += 1;
+      });
+    });
+    WorkQueue.parallel_for(range<1>{Size}, [=](id<1> Id) { Work[Id] *= 3; });
+    WorkQueue.wait_and_throw();
+
+    for (size_t I = 0; I < Size; ++I) {
+      const int Reference = (static_cast<int>(I) + 1) * 3;
+      WorkPassed &= check_value(I, Reference, Work[I], "Work");
+    }
+    WorkPassed &= WorkQueue.ext_oneapi_get_state() == EXECUTING;
+    WorkDone.wait();
+  };
+  runConcurrently(2, RecordOrWork, RecordingStarted, WorkDone);
 
   auto ExecGraph = Graph.finalize();
   for (unsigned I = 0; I < Iterations; ++I)

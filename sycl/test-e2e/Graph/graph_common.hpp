@@ -12,6 +12,7 @@
 #include <fstream>
 #include <mutex> // std::mutex, std::unique_lock
 #include <numeric>
+#include <stdexcept>
 #include <utility>
 
 #if GRAPH_TESTS_VERBOSE_PRINT
@@ -429,7 +430,8 @@ int dotp_reference_result(size_t N) {
 }
 
 /* Single use thread barrier which makes threads wait until defined number of
- * threads reach it.
+ * threads reach it. If a participating thread fails before reaching it, call
+ * abort() so the remaining threads throw instead of waiting forever.
  * std:barrier should be used instead once compiler is moved to C++20 standard.
  */
 class Barrier {
@@ -440,15 +442,26 @@ public:
     std::unique_lock<std::mutex> lock(mutex);
     if (--threadNum == 0) {
       cv.notify_all();
-    } else {
-      cv.wait(lock, [this] { return threadNum == 0; });
+      return;
     }
+    cv.wait(lock, [this] { return threadNum == 0 || aborted; });
+    if (threadNum != 0)
+      throw std::runtime_error("Barrier aborted: another thread failed");
+  }
+
+  void abort() {
+    {
+      std::lock_guard<std::mutex> lock(mutex);
+      aborted = true;
+    }
+    cv.notify_all();
   }
 
 private:
   std::mutex mutex;
   std::condition_variable cv;
   std::size_t threadNum;
+  bool aborted = false;
 };
 
 // Verify recording states of one or more queues

@@ -6,13 +6,14 @@
 
 #include <algorithm>
 #include <exception>
+#include <mutex>
 #include <thread>
 #include <vector>
 
 /// Thread count for graph threading tests. Clamped so small machines still
 /// exercise concurrency and large machines don't oversubscribe the device.
 inline unsigned numTestThreads(unsigned MinThreads = 2,
-                               unsigned MaxThreads = 8) {
+                               unsigned MaxThreads = 4) {
   return std::clamp(std::thread::hardware_concurrency(), MinThreads,
                     MaxThreads);
 }
@@ -20,10 +21,15 @@ inline unsigned numTestThreads(unsigned MinThreads = 2,
 /// Runs Func(ThreadIndex) on NumThreads threads which are released together by
 /// a barrier to maximize contention. Blocks until all threads have joined, then
 /// rethrows the first exception thrown by any thread.
-template <typename FuncT>
-void runConcurrently(unsigned NumThreads, FuncT &&Func) {
+///
+/// Barriers that Func waits on must be passed as TestBarriers. They are aborted
+/// when any thread throws, so the other threads fail instead of hanging.
+template <typename FuncT, typename... BarrierTs>
+void runConcurrently(unsigned NumThreads, FuncT &&Func,
+                     BarrierTs &...TestBarriers) {
   Barrier SyncPoint{NumThreads};
-  std::vector<std::exception_ptr> Errors(NumThreads);
+  std::mutex ErrorMutex;
+  std::exception_ptr FirstError;
   std::vector<std::thread> Threads;
   Threads.reserve(NumThreads);
 
@@ -33,7 +39,12 @@ void runConcurrently(unsigned NumThreads, FuncT &&Func) {
       try {
         Func(ThreadIndex);
       } catch (...) {
-        Errors[ThreadIndex] = std::current_exception();
+        {
+          std::lock_guard<std::mutex> Lock(ErrorMutex);
+          if (!FirstError)
+            FirstError = std::current_exception();
+        }
+        (TestBarriers.abort(), ...);
       }
     });
   }
@@ -41,9 +52,8 @@ void runConcurrently(unsigned NumThreads, FuncT &&Func) {
   for (std::thread &Thread : Threads)
     Thread.join();
 
-  for (std::exception_ptr &Error : Errors)
-    if (Error)
-      std::rethrow_exception(Error);
+  if (FirstError)
+    std::rethrow_exception(FirstError);
 }
 
 /// Creates NumQueues in-order queues sharing the context and device of Q.
@@ -68,5 +78,23 @@ inline bool checkQueueStates(const std::vector<queue> &Queues,
       Passed = false;
     }
   }
+  return Passed;
+}
+
+/// Runs Test(QueueProps) with an in-order queue and, unless native recording
+/// is enabled (it only supports in-order queues), an out-of-order queue.
+/// Returns true if every run passed.
+template <typename TestT> bool runWithQueueOrderings(TestT &&Test) {
+  bool Passed = Test(property_list{property::queue::in_order{}});
+  if (!Passed)
+    std::cerr << "Failed with in-order queue" << std::endl;
+
+#ifndef GRAPH_E2E_NATIVE_RECORDING
+  if (!Test(property_list{})) {
+    std::cerr << "Failed with out-of-order queue" << std::endl;
+    Passed = false;
+  }
+#endif
+
   return Passed;
 }

@@ -13,7 +13,7 @@ int main() {
   Barrier AllRecording{NumThreads};
   std::vector<int> Passed(NumThreads, 0);
 
-  runConcurrently(NumThreads, [&](unsigned ThreadIndex) {
+  auto RecordAndRun = [&](unsigned ThreadIndex) {
     queue &ThreadQueue = Queues[ThreadIndex];
     const int Increment = static_cast<int>(ThreadIndex) + 1;
 
@@ -59,7 +59,8 @@ int main() {
 
     free(Data, ThreadQueue);
     Passed[ThreadIndex] = ThreadPassed;
-  });
+  };
+  runConcurrently(NumThreads, RecordAndRun, AllRecording);
 
   const bool AllPassed =
       std::all_of(Passed.begin(), Passed.end(), [](int P) { return P; });

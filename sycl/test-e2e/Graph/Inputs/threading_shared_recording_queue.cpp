@@ -1,15 +1,16 @@
-// Tests multiple threads concurrently submitting to the same recording in-order
-// queue. The order in which threads' submissions interleave is undefined, so
-// each thread only touches its own slice of the data. Each thread's chain of
-// kernels is not commutative, so the in-order queue must also preserve the
-// per-thread submission order for the result to be correct.
+// Tests multiple threads concurrently submitting to the same recording queue.
+// The order in which threads' submissions interleave is undefined, so each
+// thread only touches its own slice of the data. Each thread's chain of kernels
+// is not commutative, so the chain must be ordered for the result to be
+// correct. Chains are ordered with explicit event dependencies so the same body
+// is valid for in-order and out-of-order queues.
 
 #include "../graph_threading.hpp"
 
 constexpr int KernelsPerThread = 4;
 
-int main() {
-  queue Queue{property::queue::in_order{}};
+bool runTest(const property_list &QueueProps) {
+  queue Queue{QueueProps};
 
 #ifdef GRAPH_E2E_NATIVE_RECORDING
   exp_ext::command_graph Graph{
@@ -25,15 +26,17 @@ int main() {
 
   Graph.begin_recording(Queue);
 
-  Queue.parallel_for(range<1>{Size * NumThreads},
-                     [=](id<1> Id) { Data[Id] = static_cast<int>(Id[0]); });
+  event InitEvent =
+      Queue.parallel_for(range<1>{Size * NumThreads},
+                         [=](id<1> Id) { Data[Id] = static_cast<int>(Id[0]); });
 
   runConcurrently(NumThreads, [&](unsigned ThreadIndex) {
     const int Thread = static_cast<int>(ThreadIndex);
     int *Slice = Data + ThreadIndex * Size;
 
+    event PrevEvent = InitEvent;
     for (int Kernel = 0; Kernel < KernelsPerThread; ++Kernel)
-      Queue.parallel_for(range<1>{Size}, [=](id<1> Id) {
+      PrevEvent = Queue.parallel_for(range<1>{Size}, PrevEvent, [=](id<1> Id) {
         Slice[Id] = Slice[Id] * 2 + Thread + Kernel;
       });
   });
@@ -50,6 +53,7 @@ int main() {
   auto ExecGraph = Graph.finalize();
   for (unsigned I = 0; I < Iterations; ++I)
     Queue.ext_oneapi_graph(ExecGraph);
+  Queue.wait_and_throw();
 
   std::vector<int> HostData(Size * NumThreads);
   Queue.copy(Data, HostData.data(), Size * NumThreads).wait_and_throw();
@@ -66,5 +70,7 @@ int main() {
 
   free(Data, Queue);
 
-  return Passed ? 0 : 1;
+  return Passed;
 }
+
+int main() { return runWithQueueOrderings(runTest) ? 0 : 1; }

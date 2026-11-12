@@ -32,14 +32,16 @@ TEST_F(NativeRecordingTest, UnjoinedForkDescriptiveError) {
 
   FAIL_UR_AFTER(urQueueEndGraphCaptureExp,
                 UR_RESULT_ERROR_GRAPH_UNJOINED_FORKS);
-  std::string Message = expectFailure([&]() { Graph1.end_recording(Queue); },
-                                      UR_RESULT_ERROR_GRAPH_UNJOINED_FORKS);
+  std::string Message =
+      expectFailure([&]() { Graph1.end_recording(Queue); },
+                    UR_RESULT_ERROR_GRAPH_UNJOINED_FORKS, sycl::errc::invalid);
   EXPECT_THAT(Message, HasSubstr("ending native graph capture"));
 
   auto Graph2 = makeGraph();
   Graph2.begin_recording(Queue);
-  Message = expectFailure([&]() { Graph2.end_recording(); },
-                          UR_RESULT_ERROR_GRAPH_UNJOINED_FORKS);
+  Message =
+      expectFailure([&]() { Graph2.end_recording(); },
+                    UR_RESULT_ERROR_GRAPH_UNJOINED_FORKS, sycl::errc::invalid);
   EXPECT_THAT(Message, HasSubstr("ending native graph capture"));
 }
 
@@ -56,7 +58,7 @@ TEST_F(NativeRecordingTest, InternalEventDescriptiveError) {
         Queue.submit(
             [&](sycl::handler &CGH) { CGH.single_task<TestKernel>([]() {}); });
       },
-      UR_RESULT_ERROR_GRAPH_INTERNAL_EVENT);
+      UR_RESULT_ERROR_GRAPH_INTERNAL_EVENT, sycl::errc::invalid);
 
   Graph.end_recording(Queue);
 }
@@ -74,7 +76,7 @@ TEST_F(NativeRecordingTest, MergeAttemptDescriptiveError) {
         Queue.submit(
             [&](sycl::handler &CGH) { CGH.single_task<TestKernel>([]() {}); });
       },
-      UR_RESULT_ERROR_GRAPH_CAPTURE_MERGE_ATTEMPT);
+      UR_RESULT_ERROR_GRAPH_CAPTURE_MERGE_ATTEMPT, sycl::errc::invalid);
 
   Graph.end_recording(Queue);
 }
@@ -88,7 +90,7 @@ TEST_F(NativeRecordingTest, RecordedEventHostWaitDescriptiveError) {
 
   FAIL_UR_BEFORE(urEventWait, UR_RESULT_ERROR_GRAPH_CAPTURE_UNSUPPORTED);
   expectFailure([&]() { RecordedEvent.wait(); },
-                UR_RESULT_ERROR_GRAPH_CAPTURE_UNSUPPORTED);
+                UR_RESULT_ERROR_GRAPH_CAPTURE_UNSUPPORTED, sycl::errc::invalid);
 
   Graph.end_recording(Queue);
 }
@@ -99,7 +101,7 @@ TEST_F(NativeRecordingTest, RecordingQueueWaitDescriptiveError) {
 
   FAIL_UR_BEFORE(urQueueFinish, UR_RESULT_ERROR_GRAPH_CAPTURE_UNSUPPORTED);
   expectFailure([&]() { Queue.wait(); },
-                UR_RESULT_ERROR_GRAPH_CAPTURE_UNSUPPORTED);
+                UR_RESULT_ERROR_GRAPH_CAPTURE_UNSUPPORTED, sycl::errc::invalid);
 
   Graph.end_recording(Queue);
 }
@@ -130,9 +132,9 @@ TEST_F(NativeRecordingTest, BeginRecordingDescriptiveError) {
 
   FAIL_UR_BEFORE(urQueueBeginCaptureIntoGraphExp,
                  UR_RESULT_ERROR_GRAPH_CAPTURE_UNSUPPORTED);
-  std::string Message =
-      expectFailure([&]() { Graph.begin_recording(Queue); },
-                    UR_RESULT_ERROR_GRAPH_CAPTURE_UNSUPPORTED);
+  std::string Message = expectFailure([&]() { Graph.begin_recording(Queue); },
+                                      UR_RESULT_ERROR_GRAPH_CAPTURE_UNSUPPORTED,
+                                      sycl::errc::invalid);
   EXPECT_THAT(Message, HasSubstr("begin native UR graph capture"));
 }
 
@@ -197,4 +199,126 @@ TEST_F(NativeRecordingTest, GetGraphNotRecordingError) {
   EXPECT_THAT(Message, HasSubstr("can only be called on recording queues"));
 
   Graph.end_recording(Queue);
+}
+
+// A mapped graph-misuse code is reported as errc::invalid when it reaches the
+// user through a USM memory operation, which bypasses the scheduler under
+// native recording.
+TEST_F(NativeRecordingTest, MemsetCaptureInvalidatedIsInvalid) {
+  void *Ptr = sycl::malloc_device(16, Queue);
+  auto Graph = makeGraph();
+  Graph.begin_recording(Queue);
+
+  FAIL_UR_BEFORE(urEnqueueUSMFill, UR_RESULT_ERROR_GRAPH_CAPTURE_INVALIDATED);
+  expectFailure([&]() { Queue.memset(Ptr, 0, 16); },
+                UR_RESULT_ERROR_GRAPH_CAPTURE_INVALIDATED, sycl::errc::invalid);
+
+  Graph.end_recording(Queue);
+  sycl::free(Ptr, Queue);
+}
+
+// Unmapped codes on the same memory-operation path keep errc::runtime.
+TEST_F(NativeRecordingTest, MemsetUnmappedCodesStayRuntime) {
+  void *Ptr = sycl::malloc_device(16, Queue);
+  auto Graph = makeGraph();
+  Graph.begin_recording(Queue);
+
+  FAIL_UR_BEFORE(urEnqueueUSMFill, UR_RESULT_ERROR_COMMAND_LIST_NOT_CAPTURING);
+  expectFailure([&]() { Queue.memset(Ptr, 0, 16); },
+                UR_RESULT_ERROR_COMMAND_LIST_NOT_CAPTURING);
+
+  FAIL_UR_BEFORE(urEnqueueUSMFill, UR_RESULT_ERROR_OUT_OF_RESOURCES);
+  expectFailure([&]() { Queue.memset(Ptr, 0, 16); },
+                UR_RESULT_ERROR_OUT_OF_RESOURCES);
+
+  Graph.end_recording(Queue);
+  sycl::free(Ptr, Queue);
+}
+
+// A handler memset is enqueued by the scheduler, so a UR failure surfaces from
+// the scheduler's "Enqueue process failed" site.
+TEST_F(NativeRecordingTest, SchedulerEnqueueFailureMappedIsInvalid) {
+  void *Ptr = sycl::malloc_device(16, Queue);
+  auto Graph = makeGraph();
+  Graph.begin_recording(Queue);
+
+  FAIL_UR_BEFORE(urEnqueueUSMFill, UR_RESULT_ERROR_GRAPH_CAPTURE_INVALIDATED);
+  std::string Message = expectFailure(
+      [&]() {
+        Queue.submit([&](sycl::handler &CGH) { CGH.memset(Ptr, 0, 16); });
+      },
+      UR_RESULT_ERROR_GRAPH_CAPTURE_INVALIDATED, sycl::errc::invalid);
+  EXPECT_THAT(Message, HasSubstr("Enqueue process failed"));
+
+  Graph.end_recording(Queue);
+  sycl::free(Ptr, Queue);
+}
+
+TEST_F(NativeRecordingTest, SchedulerEnqueueFailureUnmappedStaysRuntime) {
+  void *Ptr = sycl::malloc_device(16, Queue);
+  auto Graph = makeGraph();
+  Graph.begin_recording(Queue);
+
+  FAIL_UR_BEFORE(urEnqueueUSMFill, UR_RESULT_ERROR_INVALID_GRAPH);
+  std::string Message = expectFailure(
+      [&]() {
+        Queue.submit([&](sycl::handler &CGH) { CGH.memset(Ptr, 0, 16); });
+      },
+      UR_RESULT_ERROR_INVALID_GRAPH);
+  EXPECT_THAT(Message, HasSubstr("Enqueue process failed"));
+
+  FAIL_UR_BEFORE(urEnqueueUSMFill, UR_RESULT_ERROR_OUT_OF_RESOURCES);
+  Message = expectFailure(
+      [&]() {
+        Queue.submit([&](sycl::handler &CGH) { CGH.memset(Ptr, 0, 16); });
+      },
+      UR_RESULT_ERROR_OUT_OF_RESOURCES);
+  EXPECT_THAT(Message, HasSubstr("Enqueue process failed"));
+
+  Graph.end_recording(Queue);
+  sycl::free(Ptr, Queue);
+}
+
+// The kernel-launch error handler keeps errc::runtime for an unmapped graph
+// code.
+TEST_F(NativeRecordingTest, KernelLaunchUnmappedGraphCodeStaysRuntime) {
+  auto Graph = makeGraph();
+  Graph.begin_recording(Queue);
+
+  FAIL_UR_BEFORE(urEnqueueKernelLaunchWithArgsExp,
+                 UR_RESULT_ERROR_COMMAND_LIST_NOT_CAPTURING);
+  expectFailure(
+      [&]() {
+        Queue.submit(
+            [&](sycl::handler &CGH) { CGH.single_task<TestKernel>([]() {}); });
+      },
+      UR_RESULT_ERROR_COMMAND_LIST_NOT_CAPTURING);
+
+  Graph.end_recording(Queue);
+}
+
+// ext_oneapi_get_graph on a recording queue maps a graph-misuse code while
+// keeping its descriptive message.
+TEST_F(NativeRecordingTest, GetGraphMappedCodeIsInvalid) {
+  auto Graph = makeGraph();
+  Graph.begin_recording(Queue);
+
+  FAIL_UR_BEFORE(urQueueGetGraphExp, UR_RESULT_ERROR_GRAPH_CAPTURE_INVALIDATED);
+  std::string Message = expectFailure([&]() { Queue.ext_oneapi_get_graph(); },
+                                      UR_RESULT_ERROR_GRAPH_CAPTURE_INVALIDATED,
+                                      sycl::errc::invalid);
+  EXPECT_THAT(Message, HasSubstr("query native UR graph from queue"));
+
+  Graph.end_recording(Queue);
+}
+
+// A caller's explicit non-runtime errc is not overridden by the mapping.
+TEST_F(NativeRecordingTest, ExplicitErrcNotOverriddenByMapping) {
+  namespace syclexp = sycl::ext::oneapi::experimental;
+  FAIL_UR_BEFORE(urBindlessImagesImageAllocateExp,
+                 UR_RESULT_ERROR_GRAPH_CAPTURE_UNSUPPORTED);
+  syclexp::image_descriptor Desc({16, 16}, 1, sycl::image_channel_type::fp32);
+  expectFailure([&]() { syclexp::alloc_image_mem(Desc, Queue); },
+                UR_RESULT_ERROR_GRAPH_CAPTURE_UNSUPPORTED,
+                sycl::errc::memory_allocation);
 }

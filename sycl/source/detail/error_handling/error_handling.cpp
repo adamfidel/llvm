@@ -478,7 +478,7 @@ void handleErrorOrWarning(ur_result_t Error, const device_impl &DeviceImpl,
 
   default:
     throw detail::set_ur_error(
-        exception(make_error_code(errc::runtime),
+        exception(make_error_code(defaultErrcForUrResult(Error)),
                   __SYCL_UR_ERROR_REPORT(DeviceImpl.getBackend()) +
                       sycl::detail::codeToString(Error)),
         Error);

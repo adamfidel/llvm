@@ -384,7 +384,7 @@ TEST_F(NativeRecordingTest, ContextRecordingActiveBeginFailure) {
   FAIL_UR_BEFORE(urQueueBeginCaptureIntoGraphExp,
                  UR_RESULT_ERROR_GRAPH_CAPTURE_UNSUPPORTED);
   expectFailure([&]() { Graph.begin_recording(Queue); },
-                UR_RESULT_ERROR_GRAPH_CAPTURE_UNSUPPORTED);
+                UR_RESULT_ERROR_GRAPH_CAPTURE_UNSUPPORTED, sycl::errc::invalid);
   EXPECT_FALSE(Ctx.isNativeRecordingActive());
 }
 
@@ -398,7 +398,7 @@ TEST_F(NativeRecordingTest, ContextRecordingActiveEndCaptureUrFailsAfter) {
   FAIL_UR_AFTER(urQueueEndGraphCaptureExp,
                 UR_RESULT_ERROR_GRAPH_UNJOINED_FORKS);
   expectFailure([&]() { Graph.end_recording(Queue); },
-                UR_RESULT_ERROR_GRAPH_UNJOINED_FORKS);
+                UR_RESULT_ERROR_GRAPH_UNJOINED_FORKS, sycl::errc::invalid);
   EXPECT_FALSE(Ctx.isNativeRecordingActive());
 }
 

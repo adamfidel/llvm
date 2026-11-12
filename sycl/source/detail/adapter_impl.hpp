@@ -82,9 +82,13 @@ public:
   template <sycl::errc errc = sycl::errc::runtime>
   void checkUrResult(ur_result_t ur_result, const std::string &Msg) const {
     if (__builtin_expect(ur_result != UR_RESULT_SUCCESS, false))
-      throw set_ur_error(sycl::exception(sycl::make_error_code(errc),
-                                         Msg + ": " + codeToString(ur_result)),
-                         ur_result);
+      throw set_ur_error(
+          sycl::exception(
+              sycl::make_error_code(errc == sycl::errc::runtime
+                                        ? defaultErrcForUrResult(ur_result)
+                                        : errc),
+              Msg + ": " + codeToString(ur_result)),
+          ur_result);
   }
 
   std::vector<ur_platform_handle_t> &getUrPlatforms() {

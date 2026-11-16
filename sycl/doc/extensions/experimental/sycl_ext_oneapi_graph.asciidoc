@@ -1,0 +1,4 @@
+This extension has been promoted to supported. The specification for version 1
+is available link:../supported/sycl_ext_oneapi_graph.asciidoc[here], and the
+proposed version 2 is available
+link:../proposed/sycl_ext_oneapi_graph.asciidoc[here].

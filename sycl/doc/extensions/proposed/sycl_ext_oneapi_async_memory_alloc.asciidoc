@@ -99,7 +99,7 @@ pool object to control other aspects of how the memory is allocated.
 == Integration with other extensions
 
 It is a priority for this extension to integrate with the
-link:../experimental/sycl_ext_oneapi_graph.asciidoc[
+link:../proposed/sycl_ext_oneapi_graph.asciidoc[
 sycl_ext_oneapi_graph] extension. The asynchronous commands introduces in this
 extension are intended to be compatible with the SYCL Graph record and replay
 mode, however, the specifics of this will be defined in that extension.

@@ -6,7 +6,7 @@ as well as provides example code snippets for various features and usage
 scenarios.
 
 The specification for the `sycl_ext_oneapi_graph` extension can be found
-[here](../extensions/experimental/sycl_ext_oneapi_graph.asciidoc).
+[here](../extensions/supported/sycl_ext_oneapi_graph.asciidoc).
 
 ## General Usage Guidelines
 
@@ -303,7 +303,7 @@ void recordLibraryCall(queue& SyclQueue, sycl_ext::command_graph& Graph){
 
 Please see "graph-owned memory allocations" section of the
 [sycl_ext_oneapi_graph
-specification](../extensions/experimental/sycl_ext_oneapi_graph.asciidoc) for a
+specification](../extensions/proposed/sycl_ext_oneapi_graph.asciidoc) for a
 complete description of the feature.
 
 ## Code Examples
@@ -879,7 +879,7 @@ Graph.end_recording(Queue);
 ### Graph External Events
 
 The `graph_external` property from the
-[graph extension](../extensions/experimental/sycl_ext_oneapi_graph.asciidoc#graph-external-property)
+[graph extension](../extensions/proposed/sycl_ext_oneapi_graph.asciidoc#graph-external-property)
 allows recorded reusable event waits and signals to synchronize with work
 outside the graph. The following examples use native recording and the event
 operations defined by

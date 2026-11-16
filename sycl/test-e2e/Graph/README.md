@@ -1,7 +1,7 @@
 ## Overview
 
 The "Graph" directory contains tests for the
-[sycl_ext_oneapi_graph](../../doc/extensions/experimental/sycl_ext_oneapi_graph.asciidoc)
+[sycl_ext_oneapi_graph](../../doc/extensions/supported/sycl_ext_oneapi_graph.asciidoc)
 extension.
 
 Many subdirectories contain a `lit.local.cfg` file. This file sets the `lit`

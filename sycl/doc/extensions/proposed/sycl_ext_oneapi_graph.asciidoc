@@ -70,12 +70,13 @@ SYCL specification refer to that revision.
 
 == Status
 
-This is an experimental extension specification, intended to provide early
-access to features and gather community feedback.  Interfaces defined in this
-specification are implemented in {dpcpp}, but they are not finalized and may
-change incompatibly in future versions of {dpcpp} without prior notice.
-*Shipping software products should not rely on APIs defined in this
-specification.*
+This is a proposed update to an existing extension.  Interfaces defined in this
+specification may not be implemented yet or may be in a preliminary state.  The
+specification itself may also change in incompatible ways before it is
+finalized.  *Shipping software products should not rely on APIs defined in this
+specification.*  See
+link:../supported/sycl_ext_oneapi_graph.asciidoc[here] for the existing
+extension, which is implemented.
 
 == Backend support status
 
@@ -233,8 +234,10 @@ Table {counter: tableNumber}. Values of the `SYCL_EXT_ONEAPI_GRAPH` macro.
 [%header,cols="1,5"]
 |===
 |Value |Description
-|1     |Initial extension version. Base features are supported.
-|2     |Add `property::graph::enable_native_recording` to support backend-level graph capture.
+|1     |Initial version of this extension.
+|2     |Add executable graph update, graph-owned memory allocations, the
+`assume_buffer_outlives_graph` property, and graph recording of reusable event
+operations.
 |===
 
 === SYCL Graph Terminology [[terminology]]
@@ -429,6 +432,8 @@ template <int Dimensions>
 void update_nd_range(nd_range<Dimensions> executionRange);
 ----
 
+This API is available starting in version 2 of this specification.
+
 _Effects:_ Updates the ND-range for this node with a new value
 `executionRange`. This new value will not affect any executable graphs this
 node is part of until it is passed to the executable graph's update function.
@@ -451,6 +456,8 @@ template <int Dimensions>
 void update_range(range<Dimensions> executionRange);
 ----
 
+This API is available starting in version 2 of this specification.
+
 _Effects:_ Updates the execution range for this node with a new value
 `executionRange`. This new value will not affect any executable graphs this
 node is part of until it is passed to the executable graph's update function.
@@ -468,6 +475,8 @@ _Throws:_
   kernel execution.
 
 ==== Dynamic Parameters
+
+This API is available starting in version 2 of this specification.
 
 [source,c++]
 ----
@@ -538,6 +547,8 @@ It is not an error if `newValue` is set to the current parameter value in any
 registered nodes.
 
 ==== Dynamic Command Groups [[dynamic-command-groups]]
+
+This API is available starting in version 2 of this specification.
 
 [source,c++]
 ----
@@ -802,6 +813,8 @@ graph LR
 
 ==== Executable Graph Update [[executable-graph-update]]
 
+This API is available starting in version 2 of this specification.
+
 A graph in the executable state can have the configuration of its nodes modified
 using a concept called graph _update_. This avoids a user having to rebuild and
 finalize a new executable graph when only the parameters of graph nodes change
@@ -999,6 +1012,8 @@ in the new graph.
 
 ==== Graph-Owned Memory Allocations [[graph-memory-allocations]]
 
+This API is available starting in version 2 of this specification.
+
 :async_alloc_spec: xref:../proposed/sycl_ext_oneapi_async_memory_alloc.asciidoc
 
 It can be desirable for a graph to own and manage memory allocations for memory
@@ -1168,6 +1183,8 @@ behavior.
 
 ===== Assume-Buffer-Outlives-Graph Property [[assume-buffer-outlives-graph-property]]
 
+This API is available starting in version 2 of this specification.
+
 [source,c++]
 ----
 namespace sycl::ext::oneapi::experimental::property::graph {
@@ -1187,6 +1204,8 @@ graph. Destroying that buffer during the lifetime of a `command_graph`
 constructed with this property results in undefined behavior.
 
 ===== Updatable Property [[updatable-property]]
+
+This API is available starting in version 2 of this specification.
 
 [source,c++]
 ----
@@ -1408,6 +1427,8 @@ _Throws:_
 node add(dynamic_command_group& dynamicCG, const property_list& propList = {});
 ----
 
+This API is available starting in version 2 of this specification.
+
 _Effects:_ Adds the dynamic command-group `dynamicCG` as a node to the graph and sets the
 current active command-group function in `dynamicCG` as the executable for future
 executions of this graph node.
@@ -1613,6 +1634,8 @@ auto& pool = memory_pools[id];
 size_t get_required_mem_size() const noexcept;
 ----
 
+This API is available starting in version 2 of this specification.
+
 _Constraints:_ This member function is only available when the `command_graph` state is
 `graph_state::executable`.
 
@@ -1625,6 +1648,8 @@ _Returns:_ The total size in bytes of the memory required for
 ----
 void update(node& node);
 ----
+
+This API is available starting in version 2 of this specification.
 
 _Effects:_ Updates an executable graph node that corresponds to `node`.
 `node` must be a kernel execution node. The command-group function of the node
@@ -1656,6 +1681,8 @@ _Throws:_
 void update(const std::vector<node>& nodes);
 ----
 
+This API is available starting in version 2 of this specification.
+
 _Effects:_ Updates all executable graph nodes that corresponds to the nodes contained in
 `nodes`. All nodes must be kernel nodes. The command-group function of each node
 will be updated, inside the executable graph, to reflect the current values in
@@ -1685,6 +1712,8 @@ _Throws:_
 void
 update(const command_graph<graph_state::modifiable>& source);
 ----
+
+This API is available starting in version 2 of this specification.
 
 _Effects:_ Updates all of the nodes in the target graph with parameters from a
 topologically identical graph `source` in the modifiable state. The full
@@ -2106,6 +2135,8 @@ handler::require(ext::oneapi::experimental::dynamic_parameter<
                   dynamicParamAcc)
 ----
 
+This API is available starting in version 2 of this specification.
+
 _Effects:_ Requires access to a memory object associated with an accessor contained in a
 dynamic parameter `dynamicParamAcc`.
 
@@ -2123,6 +2154,8 @@ template <typename T>
 void handler::set_arg(int argIndex,
               ext::oneapi::experimental::dynamic_parameter<T> &dynamicParam);
 ----
+
+This API is available starting in version 2 of this specification.
 
 _Effects:_ Sets an argument with index `argIndex` to a kernel based on the value inside a dynamic parameter, and
 registers that dynamic parameter `dynamicParam` with the graph node encapsulating the
@@ -2297,6 +2330,8 @@ recording mode, as opposed to throwing.
 
 === Reusable Events [[reusable-events]]
 
+This API is available starting in version 2 of this specification.
+
 This section defines the graph record and replay semantics of
 `enqueue_wait_event`, `enqueue_wait_events`, and `enqueue_signal_event`, whose
 signatures and behavior are defined in
@@ -2407,6 +2442,8 @@ This section defines the interaction of `sycl_ext_oneapi_graph` with other
 extensions.
 
 ==== sycl_ext_oneapi_async_memory_alloc
+
+This API is available starting in version 2 of this specification.
 
 The APIs defined in
 link:../proposed/sycl_ext_oneapi_async_memory_alloc.asciidoc[sycl_ext_oneapi_async_memory_alloc]
@@ -2557,6 +2594,8 @@ link:../supported/sycl_ext_oneapi_queue_priority.asciidoc[sycl_ext_oneapi_queue_
 is ignored during queue recording.
 
 ==== sycl_ext_oneapi_reusable_events [[reusable-events-graph-interaction]]
+
+This API is available starting in version 2 of this specification.
 
 The graph record and replay behavior of the event operations defined by
 link:../experimental/sycl_ext_oneapi_reusable_events.asciidoc[
@@ -2904,5 +2943,7 @@ if used in application code.
 |2|2023-08-01|Pablo Reble, Ewan Crawford, Ben Tracy, Julian Miller,
 Maxime France-Pillois
 |Promote status to experimental
+|3|2026-11-16|Adam Fidel
+|Split into a supported version 1 and this proposed version 2
 
 |========================================

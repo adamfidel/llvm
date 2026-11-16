@@ -70,17 +70,11 @@ SYCL specification refer to that revision.
 
 == Status
 
-This is an experimental extension specification, intended to provide early
-access to features and gather community feedback.  Interfaces defined in this
-specification are implemented in {dpcpp}, but they are not finalized and may
-change incompatibly in future versions of {dpcpp} without prior notice.
-*Shipping software products should not rely on APIs defined in this
-specification.*
+This extension is implemented and fully supported by {dpcpp}.
 
 == Backend support status
 
-Due to the experimental nature of the extension, support is not available across
-all devices.
+Support for this extension is not available across all devices.
 
 Table {counter: tableNumber}. Device Support Aspect.
 [%header]
@@ -236,8 +230,7 @@ Table {counter: tableNumber}. Values of the `SYCL_EXT_ONEAPI_GRAPH` macro.
 [%header,cols="1,5"]
 |===
 |Value |Description
-|1     |Initial extension version. Base features are supported.
-|2     |Add `property::graph::enable_native_recording` to support backend-level graph capture.
+|1     |Initial version of this extension.
 |===
 
 === SYCL Graph Terminology [[terminology]]
@@ -1782,5 +1775,8 @@ if used in application code.
 |2|2023-08-01|Pablo Reble, Ewan Crawford, Ben Tracy, Julian Miller,
 Maxime France-Pillois
 |Promote status to experimental
+|3|2026-11-16|Adam Fidel
+|Promote version 1 to supported. APIs not in version 1 remain in the
+proposed version 2 document
 
 |========================================

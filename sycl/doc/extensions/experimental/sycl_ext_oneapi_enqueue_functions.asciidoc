@@ -787,7 +787,7 @@ _{endnote}_]
 ==== Command Graph
 
 The functions in this section are only available if the
-link:./sycl_ext_oneapi_graph.asciidoc[
+link:../supported/sycl_ext_oneapi_graph.asciidoc[
   sycl_ext_oneapi_graph] extension is supported.
 
 |====

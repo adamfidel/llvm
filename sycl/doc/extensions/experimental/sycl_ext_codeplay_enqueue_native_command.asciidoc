@@ -191,7 +191,7 @@ _{endnote}_]
 === SYCL-Graph Interaction
 
 This section defines the interaction with the
-link:../experimental/sycl_ext_oneapi_graph.asciidoc[sycl_ext_oneapi_graph]
+link:../supported/sycl_ext_oneapi_graph.asciidoc[sycl_ext_oneapi_graph]
 extension.
 
 The APIs defined in this section of the extension specification are only

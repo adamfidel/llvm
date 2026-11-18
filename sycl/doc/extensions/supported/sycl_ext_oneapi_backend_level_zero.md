@@ -282,7 +282,7 @@ ext::oneapi::experimental::command_graph<
     ext::oneapi::experimental::graph_state::executable>
 ```
 
-See [sycl_ext_oneapi_graph](../experimental/sycl_ext_oneapi_graph.asciidoc)
+See [sycl_ext_oneapi_graph](../supported/sycl_ext_oneapi_graph.asciidoc)
 
 </td>
 
